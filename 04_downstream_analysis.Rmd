@@ -1,0 +1,785 @@
+---
+title: "Downstream analysis on integrated dataset, `r basename(params$path.to.sobj)`"
+author:
+  - "trnguyen@ukaachen.de"
+date: "Last update on `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    keep_md: no
+    df_print: paged
+    toc: true
+    toc_float:
+      toc_collapsed: false
+    toc_depth: 3
+    number_sections: true
+    theme: lumen
+params:
+  path.to.sobj: NA
+---
+
+
+```{css zoom-lib-src, echo = FALSE}
+script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
+```
+
+```{js zoom-jquery, echo = FALSE}
+ $(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+      $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+      $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+      $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+  });
+```
+
+<style type="text/css">
+    div.datatables { height: auto !important;}
+</style>
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='hide', fig.width=14, fig.height=10}
+#####----------------------------------------------------------------------#####
+#
+# trnguyen@ukaachen.de
+#
+#####----------------------------------------------------------------------#####
+
+##### clean up #####
+# gc()
+# rm(list = ls())
+
+code.version <- "20240601"
+options(future.globals.maxSize = 10000 * 1024^2)
+PROJECT <- "integrated_BrainMet_dataset"
+
+path.to.pipeline.src <- "/media/hieunguyen/HNSD01/src/src_pipeline/scRNA_GEX_pipeline_SeuratV5"
+source(file.path(path.to.pipeline.src, "processes_src", "import_libraries.R"))
+source(file.path(path.to.pipeline.src, "processes_src", "helper_functions.R"))
+
+path.to.main.src <- file.path("/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq", code.version)
+all.integrated.metadata <- list(v0.1 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240513.csv")))
+
+integrated.version <- "v0.2"
+outdir <- "/media/hieunguyen/HNSD01/outdir"
+main.PROJECT <- "BrainMet_SeuratV5"
+
+# cluster.resolution <- params$cluster.resolution
+# path.to.sobj <- params$path.to.sobj
+
+cluster.resolution <- 0.5
+path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
+path.to.02.output <- file.path(path.to.main.output, "02_output_test")
+path.to.03.output <- file.path(path.to.main.output, "03_output_test")
+path.to.06.output <- file.path(path.to.main.output, sprintf("06_output_test_%s", cluster.resolution))
+
+path.to.sobj <- file.path(path.to.06.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))
+# path.to.sobj <- file.path(path.to.03.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))
+  
+if (grepl("03_output", path.to.sobj) == TRUE){
+  object.save.name <- "all_cells"
+} else if (grepl("06_output", path.to.sobj) == TRUE){
+  object.save.name <- "immune_cells_CD45_only"
+}
+
+path.to.04.output <- file.path(path.to.main.output, "04_output_test", object.save.name)
+dir.create(path.to.04.output, showWarnings = FALSE, recursive = TRUE)
+
+s.obj <- readRDS(path.to.sobj)
+
+spec <- "Human"
+topN <- 10
+```
+
+# UMAP
+## All samples {.tabset}
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+# for (reduction.method in c("cca", "rpca", "harmony")){
+for (reduction.method in c("harmony")){
+  cat(sprintf("### Reduction method %s \n", reduction.method))
+  p <- DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label = TRUE, label.box = TRUE, repel = TRUE, group.by = sprintf("%s.cluster.0.5", reduction.method))  
+  print(p)
+  cat("\n \n")
+}
+
+reduction.method <- "harmony"
+Idents(s.obj) <- "harmony.cluster.0.5"
+```
+
+# Cluster marker genes
+
+Identify differentially expressed genes in each cluster. 
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='hide', fig.height=10, fig.width=18}
+min.pct <- 0.5
+Idents(s.obj) <- sprintf("%s.cluster.0.5", reduction.method)
+if (file.exists(file.path(path.to.04.output, sprintf("DE_cluster_marker_genes_min_pct_%s_reduction_method_%s.rds", min.pct, reduction.method))) == FALSE){
+  print("Start preparation for find all markers ...")
+  DefaultAssay(s.obj) <- "SCT"
+  s.obj <- PrepSCTFindMarkers(s.obj)
+  print("start running FindAllMarkers ...")
+  cluster.markers <- FindAllMarkers(object = s.obj, assay = "SCT", test.use = "wilcox", slot = "data", min.pct = min.pct, recorrect_umi = TRUE)
+  cluster.markers <- subset(cluster.markers, cluster.markers$p_val_adj < 0.05 & cluster.markers$avg_log2FC > 0)
+  saveRDS(cluster.markers, file.path(path.to.04.output, sprintf("DE_cluster_marker_genes_min_pct_%s_reduction_method_%s.rds", min.pct, reduction.method)))
+} else {
+  cluster.markers <- readRDS(file.path(path.to.04.output, sprintf("DE_cluster_marker_genes_min_pct_%s_reduction_method_%s.rds", min.pct, reduction.method)))
+}
+
+```
+
+## Feature plot {.tabset}
+```{r echo=FALSE, fig.height=12, fig.width=20, message=FALSE, warning=FALSE, results='asis'}
+for (cluster.id in sort(unique(cluster.markers$cluster))){
+  DefaultAssay(s.obj) <- "SCT"
+  cat(sprintf("### Cluster %s \n", cluster.id))
+  tmp.cluster.markers <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
+  p <- FeaturePlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), features = head(tmp.cluster.markers, 9)$gene, ncol = 3, label = TRUE, pt.size = 0.5, label.size = 5, label.color = "red", slot = "data")  
+  print(p)
+  cat("\n \n")
+}
+```
+
+## Dot plot{.tabset}
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+for (cluster.id in sort(unique(cluster.markers$cluster))){
+  DefaultAssay(s.obj) <- "SCT"
+  cat(sprintf("### Cluster %s \n", cluster.id))
+  tmp.cluster.markers <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
+  p <- DotPlot(object = s.obj, features = head(tmp.cluster.markers, 9)$gene, group.by = sprintf("%s.cluster.0.5", reduction.method))  
+  print(p)
+  cat("\n \n")
+}
+```
+
+## Violin plot{.tabset}
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+for (cluster.id in sort(unique(cluster.markers$cluster))){
+  DefaultAssay(s.obj) <- "SCT"
+  cat(sprintf("### Cluster %s \n", cluster.id))
+  tmp.cluster.markers <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
+  p <- VlnPlot(object = s.obj, features = head(tmp.cluster.markers, 9)$gene, slot = "data",  group.by = sprintf("%s.cluster.0.5", reduction.method), pt.size = 0)  
+  print(p)
+  cat("\n \n")
+}
+```
+
+## Full tables of DE genes {.tabset}
+```{r echo=FALSE, results='asis', include=FALSE}
+cluster.markers %>% create_dt()
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+all.cluster.ids <- sort(unique(s.obj$harmony.cluster.0.5))
+for (cluster.id in all.cluster.ids){
+  tmp.table <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
+  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
+  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
+                                      filter = "top",
+                                      options = list(dom = 'Blfrtip',
+                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                                     lengthMenu = list(c(10,25,50,-1),
+                                                                       c(10,25,50,"All")),
+                                                     columnDefs = list(list(
+                                                       targets = "_all",
+                                                       render = JS(
+                                                         "function(data, type, row, meta) {",
+                                                         "return type === 'display' && data != null && data.length > 100 ?",
+                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
+                                                         "}")
+                                                     ))
+                                      ))))
+  cat("\n \n")  
+}
+```
+
+
+# Number of cells in each cluster in each sample
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+cell.count.in.clusters <- table(s.obj$name, s.obj$harmony.cluster.0.5) %>% as.data.frame() %>%
+  pivot_wider(names_from = "Var2", values_from = "Freq") 
+cell.count.in.clusters %>% create_dt()
+```
+
+
+# Cell type annotation by pathway analysis with CellMarkers 2.0
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+if (packageVersion("clusterProfiler") != "4.10.1"){
+  remove.packages("clusterProfiler")
+  remove.packages("DOSE")
+  remove.packages("GOSemSim")
+  path.to.install.dir <- "/media/hieunguyen/HD0/storage/offline_pkgs/clusterProfiler"
+  install.packages(file.path(path.to.install.dir, "HDO.db_0.99.1.tar.gz"), type = "source", repos = NULL)
+  install.packages(file.path(path.to.install.dir, "yulab.utils_0.1.4.tar.gz"), type = "source", repos = NULL)
+  install.packages(file.path(path.to.install.dir, "GOSemSim_2.28.1.tar.gz"), type = "source", repos = NULL)
+  install.packages(file.path(path.to.install.dir, "DOSE_3.28.2.tar.gz"), type = "source", repos = NULL) 
+  install.packages(file.path(path.to.install.dir, "gson_0.1.0.tar.gz"), type = "source", repos = NULL)
+  install.packages(file.path(path.to.install.dir, "clusterProfiler_4.10.1.tar.gz"), type = "source", repos = NULL) 
+}
+
+library(clusterProfiler)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+if ("org.Mm.eg.db" %in% installed.packages() == FALSE){
+  BiocManager::install("org.Mm.eg.db")
+}
+library("org.Mm.eg.db")
+
+annotate_with_pathway <- function(cluster.id, topN = 20, spec = "Human"){
+  if (topN == "all"){
+      tmpdf <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
+  } else {
+      tmpdf <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC)) %>% head(topN)    
+  }
+  if (nrow(tmpdf) != 0){
+    path.to.cellmarker2.0 <- "/media/hieunguyen/HNHD01/data/CellMarkers_2.0"
+    if (spec == "Human"){
+      cell_marker_data <- readxl::read_excel(file.path(path.to.cellmarker2.0, "Cell_marker_Human.xlsx"))
+      convertdf <- bitr(tmpdf$gene, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")    
+    } else if (spec == "Mouse"){
+      cell_marker_data <- readxl::read_excel(file.path(path.to.cellmarker2.0, "Cell_marker_Mouse.xlsx"))
+      convertdf <- bitr(tmpdf$gene, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Mm.eg.db")   
+    }
+  
+    cells <- cell_marker_data %>%
+        dplyr::select(cell_name, GeneID) %>%
+        dplyr::mutate(GeneID = strsplit(GeneID, ', ')) %>%
+        tidyr::unnest()
+    if (nrow(convertdf) > 2){
+      x <- enricher(convertdf$ENTREZID, TERM2GENE = cells) %>% 
+      as.data.frame() %>% subset(p.adjust <= 0.05)
+      x <- x %>% subset(select = -c(geneID)) %>% arrange(desc(Count))      
+    } else {
+      x <- data.frame()
+    }
+
+  } else {
+    x <- data.frame()
+  }
+  return(x)  
+}
+```
+
+## Result tables {.tabset}
+```{r echo=FALSE, results='asis', include=FALSE}
+annotate_with_pathway( cluster.id = 1, spec = spec, topN = topN) %>% create_dt()
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+annotationdf <- data.frame()
+top5.annotationdf <- data.frame()
+
+available.diff.clusters <- unique(cluster.markers$cluster)
+
+for (cluster.id in all.cluster.ids){
+  if (cluster.id %in% available.diff.clusters == FALSE){
+    tmp.table <- data.frame(status = c("Cell type not detected!"))
+  } else {
+      tmp.table <- annotate_with_pathway(cluster.id = cluster.id, topN = topN, spec = spec)
+  }
+
+  if (nrow(tmp.table) == 0 | "status" %in% colnames(tmp.table)){
+    tmp.table <- data.frame(status = c("Cell type not detected!"))
+  } else {
+      tmpdf <- data.frame(cluster.id = c(cluster.id), annotation = c(head(tmp.table, 1)$ID))
+      annotationdf <- rbind(annotationdf, tmpdf)
+      
+      tmpdf <- data.frame(cluster.id = c(cluster.id), annotation = c(paste(head(tmp.table, 5)$ID, collapse = ", ")))
+      top5.annotationdf <- rbind(top5.annotationdf, tmpdf)
+    
+  }
+  
+  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
+  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
+                                      filter = "top",
+                                      options = list(dom = 'Blfrtip',
+                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                                     lengthMenu = list(c(10,25,50,-1),
+                                                                       c(10,25,50,"All")),
+                                                     columnDefs = list(list(
+                                                       targets = "_all",
+                                                       render = JS(
+                                                         "function(data, type, row, meta) {",
+                                                         "return type === 'display' && data != null && data.length > 100 ?",
+                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
+                                                         "}")
+                                                     ))
+                                      ))))
+  cat("\n \n")  
+}
+```
+
+## Top-1 annotation for each cluster
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+annotationdf %>% create_dt()
+```
+
+## Top-5 annotation for each clusters
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+top5.annotationdf %>% create_dt()
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+meta.data <- s.obj@meta.data %>% rownames_to_column("barcode") %>%
+  rowwise() %>%
+  mutate(prediction2 = ifelse(nrow(subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)) != 0, 
+                              subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)$annotation,
+                              "None")) %>%
+  column_to_rownames("barcode")
+meta.data <- meta.data[row.names(s.obj@meta.data),]
+s.obj <- AddMetaData(s.obj, metadata = meta.data$prediction2, col.name = "prediction2")
+
+DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label.box = TRUE, label = TRUE, repel = TRUE, group.by = "prediction2")
+```
+
+## Number of cells in each annotated cluster (top-1 annotation)
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+table(s.obj$prediction2, s.obj$name) %>% as.data.frame() %>% pivot_wider(names_from = "Var1", values_from = "Freq") %>% create_dt()
+```
+
+# Number of cells in each cluster
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+count.cell.in.cluster <- s.obj@meta.data %>% subset(select = c(name, harmony.cluster.0.5)) %>% table() %>% as.data.frame()
+count.cell.in.cluster.wider <- count.cell.in.cluster %>% pivot_wider(names_from = "name", values_from = "Freq") 
+
+pct.table <- count.cell.in.cluster.wider %>% column_to_rownames(sprintf("%s.cluster.0.5", reduction.method))
+colsum.table <- colSums(pct.table)
+rowsum.table <- rowSums(pct.table)
+names(rowsum.table) <- to_vec(for (item in names(rowsum.table)) sprintf("cluster_%s", item))
+
+pct.table.sample <- pct.table # distribution of cells from each cluster in each sample
+pct.table.cluster <- pct.table %>% t() %>% as.data.frame() # distribution of cell from each sample in each cluster
+colnames(pct.table.cluster) <- to_vec(for (item in colnames(pct.table.cluster)) sprintf("cluster_%s", item))
+
+for (sample.id in colnames(pct.table.sample)){
+  pct.table.sample[[sample.id]] <- to_vec( for(item in pct.table.sample[[sample.id]]) item/colsum.table[[sample.id]])
+}
+
+for (cluster.id in colnames(pct.table.cluster)){
+  pct.table.cluster[[cluster.id]] <- to_vec( for(item in pct.table.cluster[[cluster.id]]) item/rowsum.table[[cluster.id]])
+}
+```
+
+## Table
+### Raw counts 
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+count.cell.in.cluster.wider %>% create_dt()
+```
+
+### Percentage in each cluster
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+pct.table.cluster %>% create_dt()
+```
+
+### Percentage in each sample
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+pct.table.cluster %>% create_dt()
+```
+
+## Barplot
+
+### Raw counts
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+p <- count.cell.in.cluster %>% ggplot(aes(x = harmony.cluster.0.5, y = Freq, fill = name)) + geom_bar(stat = "identity", dodge = "stack")
+ggplotly(p)
+```
+
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+p <- count.cell.in.cluster %>% ggplot(aes(x = name, y = Freq, fill = harmony.cluster.0.5)) + geom_bar(stat = "identity", dodge = "stack") + 
+  theme(axis.text.x = element_text(angle = 90))
+ggplotly(p)
+```
+
+### Percentages
+
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+pct.table.sample.longer <- pct.table.sample %>% rownames_to_column(sprintf("%s.cluster.0.5", reduction.method)) %>% 
+  pivot_longer(!harmony.cluster.0.5, names_to = "name", values_to = "Freq")
+pct.table.sample.longer$harmony.cluster.0.5 <- factor(pct.table.sample.longer$harmony.cluster.0.5, levels = seq(0, length(unique(pct.table.sample.longer$harmony.cluster.0.5)) - 1))
+p <- pct.table.sample.longer  %>% 
+  ggplot(aes(x = name, y = Freq, fill = harmony.cluster.0.5)) + geom_bar(stat = "identity", dodge = "stack") + 
+  theme(axis.text.x = element_text(angle = 90))
+ggplotly(p)
+```
+
+
+```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
+pct.table.cluster.longer <- pct.table.cluster %>% rownames_to_column("name") %>% 
+  pivot_longer(!name, names_to = sprintf("%s.cluster.0.5", reduction.method), values_to = "Freq")
+
+p <- pct.table.cluster.longer  %>% 
+  ggplot(aes(x = harmony.cluster.0.5, y = Freq, fill = name)) + geom_bar(stat = "identity", dodge = "stack") + 
+  theme(axis.text.x = element_text(angle = 90))
+ggplotly(p)
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+all.integrated.metadata <- list(v0.1 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240513.csv")),
+                                v0.2 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240620.csv")))
+sample.metadata <- all.integrated.metadata[[integrated.version]]
+```
+
+## Sample/Dataset metadata
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+sample.metadata %>% create_dt()
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+meta.data <- s.obj@meta.data %>% rownames_to_column("barcode")
+meta.data$group <- unlist(lapply(meta.data$name, function(x){
+    return(subset(sample.metadata, sample.metadata$Sample == x)$Group)}))
+meta.data <- meta.data %>% column_to_rownames("barcode")
+meta.data <- meta.data[row.names(s.obj@meta.data), ]
+s.obj <- AddMetaData(object = s.obj, metadata = meta.data$group, col.name = "group")
+tk.gene.set <- read.csv("/media/hieunguyen/HNHD01/data/UKK/geneSet/TK_genes.csv")$TK_gene
+tk.gene.set.split <- split(tk.gene.set, seq(1, 22))
+
+dir.create(file.path(path.to.04.output, "TK_genes"), showWarnings = FALSE, recursive = TRUE)
+for (gene.id in tk.gene.set){
+  if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id))) == FALSE){
+    p.celltype <- VlnPlot(object = s.obj, group.by = "prediction2", features = c(gene.id), split.by = "group", pt.size = 0)
+    ggsave(plot = p.celltype, filename = sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))
+  }
+  if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_clusters.png", gene.id))) == FALSE){
+    p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.0.5", reduction.method), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
+    ggsave(plot = p.clusters, filename = sprintf("violin_plot_group_%s_clusters.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))    
+  }
+}
+```
+
+# Differential gene expression analysis between "BrainMet" and "Control Epilepsy"
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+if (file.exists(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.rds")) == FALSE){
+  s.obj <- PrepSCTFindMarkers(s.obj)
+  diff.markers <- hash()
+  diff.markers.raw <- hash()
+  count.cells.in.clusters <- table(s.obj$group, s.obj$harmony.cluster.0.5) %>% as.data.frame()
+  for (cluster.id in unique(s.obj$harmony.cluster.0.5)){
+    count.control.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "Control Epilepsy")$Freq
+    count.BrMet.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "BrainMet")$Freq
+    tmp.s.obj <- subset(s.obj, harmony.cluster.0.5 == cluster.id)
+    if (count.control.cells >= 10 & count.BrMet.cells >= 10){
+        diff.markers.raw[[cluster.id]] <- FindMarkers(object = tmp.s.obj, ident.1 = "BrainMet", ident.2 = "Control Epilepsy", group.by = "group", assay = "SCT", recorrect_umi = FALSE) 
+        diff.markers[[cluster.id]] <- diff.markers.raw[[cluster.id]]%>%
+          subset(p_val_adj <= 0.05) %>% 
+          rownames_to_column("Gene") %>% 
+          rowwise() %>%
+          mutate(abs.logFC = abs(avg_log2FC)) %>% arrange(desc(abs.logFC))      
+    } else {
+      diff.markers.raw[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
+      diff.markers[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
+    }
+  }
+  saveRDS(diff.markers.raw, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.raw.rds"))
+  saveRDS(diff.markers, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.rds"))
+} else {
+  diff.markers <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.rds"))
+  diff.markers.raw <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.raw.rds"))
+}
+```
+
+## Full tables of DE genes {.tabset}
+```{r echo=FALSE, results='asis', include=FALSE}
+diff.markers$`1` %>% create_dt()
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+for (cluster.id in names(diff.markers)){
+  tmp.table <- diff.markers[[cluster.id]]
+  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
+  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
+                                      filter = "top",
+                                      options = list(dom = 'Blfrtip',
+                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                                     lengthMenu = list(c(10,25,50,-1),
+                                                                       c(10,25,50,"All")),
+                                                     columnDefs = list(list(
+                                                       targets = "_all",
+                                                       render = JS(
+                                                         "function(data, type, row, meta) {",
+                                                         "return type === 'display' && data != null && data.length > 100 ?",
+                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
+                                                         "}")
+                                                     ))
+                                      ))))
+  cat("\n \n")  
+}
+```
+
+## Volcano plot {.tabset}
+
+- Positive logFC indicates that the gene is "up" in Brain Met.
+
+- Negative logFC indicates that the gene is "up" in Control
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+for (cluster.id in names(diff.markers)){
+  cat(sprintf("### Cluster %s \n", cluster.id))
+  input.df <- diff.markers.raw[[cluster.id]] %>% rownames_to_column("Gene")
+  if ("status" %in% colnames(input.df) == FALSE & nrow(input.df) != 0){
+    top10up.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC > 1) %>% arrange(desc(avg_log2FC)) %>% head(10)
+    top10down.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC < -1) %>% arrange(desc(avg_log2FC)) %>% tail(10)
+    input.df <- input.df %>%
+    rowwise() %>%
+    mutate(sig = ifelse(p_val_adj <= 0.05, "Sig.", "not Sig.")) %>%
+      mutate(show.gene.name = ifelse(Gene %in% c(top10up.genes$Gene, top10down.genes$Gene), Gene, NA))
+    
+    cutoff.adjp <- 0.05
+    volcano.plot <- ggplot(data=input.df, 
+                            aes(x=avg_log2FC, y=-log10(p_val_adj), col = sig, label=Gene)) + 
+                            geom_point() + geom_label_repel(label = input.df$show.gene.name, size = 8) + 
+                            scale_color_manual(values=c("#c0d2f0", "#f28095")) +
+                            theme_minimal() +
+                            geom_vline(xintercept=c(-1, 1), col="#9a9fa6", linetype='dotted') +
+                            geom_hline(yintercept=-log10(cutoff.adjp), col="#9a9fa6", linetype='dotted') +
+                            #geom_text() +
+                          theme_bw() + 
+                          theme(plot.title = element_text(hjust=0.5, face="bold", size = 12), axis.text=element_text(size=12))
+    
+  } else {
+    volcano.plot <- ggplot() + ggtitle("Not enough cells to conduct DE test")
+  }
+  print(volcano.plot)
+  cat("\n \n")
+}
+```
+
+# Differential gene expression analysis between "BrainMet" and "Control Glioma"
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+if (file.exists(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.rds")) == FALSE){
+  s.obj <- PrepSCTFindMarkers(s.obj)
+  diff.markers <- hash()
+  diff.markers.raw <- hash()
+  count.cells.in.clusters <- table(s.obj$group, s.obj$harmony.cluster.0.5) %>% as.data.frame()
+  for (cluster.id in unique(s.obj$harmony.cluster.0.5)){
+    count.control.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "Control Glioma")$Freq
+    count.BrMet.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "BrainMet")$Freq
+    tmp.s.obj <- subset(s.obj, harmony.cluster.0.5 == cluster.id)
+    if (count.control.cells >= 10 & count.BrMet.cells >= 10){
+      diff.markers.raw[[cluster.id]] <- FindMarkers(object = tmp.s.obj, ident.1 = "BrainMet", ident.2 = "Control Glioma", group.by = "group", assay = "SCT", recorrect_umi = FALSE) 
+      diff.markers[[cluster.id]] <- diff.markers.raw[[cluster.id]]%>%
+        subset(p_val_adj <= 0.05) %>% 
+        rownames_to_column("Gene") %>% 
+        rowwise() %>%
+        mutate(abs.logFC = abs(avg_log2FC)) %>% arrange(desc(abs.logFC))      
+    } else {
+      diff.markers.raw[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
+      diff.markers[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
+    }
+  }
+  saveRDS(diff.markers.raw, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.raw.rds"))
+  saveRDS(diff.markers, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.rds"))
+} else {
+  diff.markers <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.rds"))
+  diff.markers.raw <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.raw.rds"))
+}
+```
+
+## Full tables of DE genes {.tabset}
+```{r echo=FALSE, results='asis', include=FALSE}
+diff.markers$`1` %>% create_dt()
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
+for (cluster.id in names(diff.markers)){
+  tmp.table <- diff.markers[[cluster.id]]
+  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
+  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
+                                      filter = "top",
+                                      options = list(dom = 'Blfrtip',
+                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                                     lengthMenu = list(c(10,25,50,-1),
+                                                                       c(10,25,50,"All")),
+                                                     columnDefs = list(list(
+                                                       targets = "_all",
+                                                       render = JS(
+                                                         "function(data, type, row, meta) {",
+                                                         "return type === 'display' && data != null && data.length > 100 ?",
+                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
+                                                         "}")
+                                                     ))
+                                      ))))
+  cat("\n \n")  
+}
+```
+
+## Volcano plot {.tabset}
+
+- Positive logFC indicates that the gene is "up" in Brain Met.
+
+- Negative logFC indicates that the gene is "up" in Control
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+for (cluster.id in names(diff.markers)){
+  cat(sprintf("### Cluster %s \n", cluster.id))
+  input.df <- diff.markers.raw[[cluster.id]] %>% rownames_to_column("Gene")
+  if ("status" %in% colnames(input.df) == FALSE & nrow(input.df) != 0){
+    top10up.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC > 1) %>% arrange(desc(avg_log2FC)) %>% head(10)
+    top10down.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC < -1) %>% arrange(desc(avg_log2FC)) %>% tail(10)
+    input.df <- input.df %>%
+      rowwise() %>%
+      mutate(sig = ifelse(p_val_adj <= 0.05, "Sig.", "not Sig.")) %>%
+      mutate(show.gene.name = ifelse(Gene %in% c(top10up.genes$Gene, top10down.genes$Gene), Gene, NA))
+    
+    cutoff.adjp <- 0.05
+    volcano.plot <- ggplot(data=input.df, 
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = sig, label=Gene)) + 
+      geom_point() + geom_label_repel(label = input.df$show.gene.name, size = 8) + 
+      scale_color_manual(values=c("#c0d2f0", "#f28095")) +
+      theme_minimal() +
+      geom_vline(xintercept=c(-1, 1), col="#9a9fa6", linetype='dotted') +
+      geom_hline(yintercept=-log10(cutoff.adjp), col="#9a9fa6", linetype='dotted') +
+      #geom_text() +
+      theme_bw() + 
+      theme(plot.title = element_text(hjust=0.5, face="bold", size = 12), axis.text=element_text(size=12))
+    
+  } else {
+    volcano.plot <- ggplot() + ggtitle("Not enough cells to conduct DE test")
+  }
+  print(volcano.plot)
+  cat("\n \n")
+}
+```
+
+# Cell type marker genes (update 16.06.2024)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+path.to.project.src <- "/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq/20240601"
+celltype.markers <- readxl::read_excel(file.path(path.to.project.src, "cell_type_markers_20240616.xlsx"))
+markerdb <- data.frame()
+for (col in colnames(celltype.markers)){
+  tmpdf <- data.frame(GeneID = unique(celltype.markers[[col]]))
+  tmpdf$cell_name <- col
+  tmpdf <- tmpdf[, c("cell_name", "GeneID")]
+  markerdb <- rbind(markerdb, tmpdf)
+}
+
+annotate_with_pathway_custom_db <- function(cluster.id, inputdb, topN = 20){
+  if (topN == "all"){
+      tmpdf <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
+  } else {
+      tmpdf <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC)) %>% head(topN)    
+  }
+  if (nrow(tmpdf) != 0){
+    if (nrow(tmpdf) > 2){
+      x <- enricher(tmpdf$gene, TERM2GENE = inputdb) 
+      if (is.null(x) == FALSE){
+             x <- x %>% 
+      as.data.frame() %>% subset(p.adjust <= 0.05)
+      x <- x %>% subset(select = -c(geneID)) %>% arrange(desc(Count))   
+      } else {
+        x <- data.frame()
+      }
+    } else {
+      x <- data.frame()
+    }
+
+  } else {
+    x <- data.frame()
+  }
+  return(x)  
+}
+```
+## Annotation results based on new cell type markers {.tabset}
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+annotationdf <- data.frame()
+top5.annotationdf <- data.frame()
+
+available.diff.clusters <- unique(cluster.markers$cluster)
+
+for (cluster.id in all.cluster.ids){
+  if (cluster.id %in% available.diff.clusters == FALSE){
+    tmp.table <- data.frame(status = c("Cell type not detected!"))
+  } else {
+      tmp.table <- annotate_with_pathway_custom_db(cluster.id = cluster.id, topN = topN, inputdb = markerdb)
+  }
+
+  if (nrow(tmp.table) == 0 | "status" %in% colnames(tmp.table)){
+    tmp.table <- data.frame(status = c("Cell type not detected!"))
+  } else {
+      tmpdf <- data.frame(cluster.id = c(cluster.id), annotation = c(head(tmp.table, 1)$ID))
+      annotationdf <- rbind(annotationdf, tmpdf)
+      
+      tmpdf <- data.frame(cluster.id = c(cluster.id), annotation = c(paste(head(tmp.table, 5)$ID, collapse = ", ")))
+      top5.annotationdf <- rbind(top5.annotationdf, tmpdf)
+    
+  }
+  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
+  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
+                                      filter = "top",
+                                      options = list(dom = 'Blfrtip',
+                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                                                     lengthMenu = list(c(10,25,50,-1),
+                                                                       c(10,25,50,"All")),
+                                                     columnDefs = list(list(
+                                                       targets = "_all",
+                                                       render = JS(
+                                                         "function(data, type, row, meta) {",
+                                                         "return type === 'display' && data != null && data.length > 100 ?",
+                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
+                                                         "}")
+                                                     ))
+                                      ))))
+  cat("\n \n")  
+}
+```
+
+# All predicted annotation (new list of cell type markers)
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+annotationdf %>% create_dt()
+```
+
+# All top-5 predicted annotations (new list of cell type markers)
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+top5.annotationdf %>% create_dt()
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+meta.data <- s.obj@meta.data %>% rownames_to_column("barcode") %>%
+  rowwise() %>%
+  mutate(prediction3 = ifelse(nrow(subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)) != 0, 
+                              subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)$annotation,
+                              "None")) %>%
+  column_to_rownames("barcode")
+meta.data <- meta.data[row.names(s.obj@meta.data),]
+s.obj <- AddMetaData(s.obj, metadata = meta.data$prediction3, col.name = "prediction3")
+
+DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label.box = TRUE, label = TRUE, repel = TRUE, group.by = "prediction3")
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+#####----------------------------------------------------------------------#####
+##### Generate violin plot and umap for each gene in each cell type marker genes
+#####----------------------------------------------------------------------#####
+DefaultAssay(s.obj) <- "SCT"
+for (cell.type in unique(markerdb$cell_name)){
+  dir.create(file.path(path.to.04.output, "celltype_markers", cell.type), showWarnings = FALSE, recursive = TRUE)
+  tmp.marker.genes <- subset(markerdb, markerdb$cell_name == cell.type)$GeneID
+  tmp.marker.genes <- tmp.marker.genes[is.na(tmp.marker.genes) == FALSE]
+  
+  for (gene.id in intersect(tmp.marker.genes, row.names(s.obj))){
+    if (file.exists(file.path(path.to.04.output, "celltype_markers", cell.type, sprintf("Celltype_%s_gene_%s.svg", cell.type, gene.id))) == FALSE){
+      # print(sprintf("Working on cell type %s, gene.id %s", cell.type, gene.id))
+      umap.plot <- FeaturePlot(object = s.obj, reduction = "harmony_UMAP", features = c(gene.id), label = TRUE, slot = "data")
+      vln.plot <- VlnPlot(object = s.obj, features = c(gene.id), slot = "data", assay = "SCT")
+      p <- umap.plot + vln.plot
+      ggsave(plot = p, filename = sprintf("Celltype_%s_gene_%s.png", cell.type, gene.id), 
+             path = file.path(path.to.04.output, "celltype_markers", cell.type), 
+             width = 14, 
+             height = 20,
+             device = "png")
+    } else {
+      # print("file exists")
+    }
+  }  
+}
+
+```
+
+
