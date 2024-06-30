@@ -52,7 +52,7 @@ script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"
 # gc()
 # rm(list = ls())
 
-code.version <- "20240601"
+code.version <- "integrate_BrainMet_datasets"
 options(future.globals.maxSize = 10000 * 1024^2)
 PROJECT <- "integrated_BrainMet_dataset"
 
@@ -72,9 +72,9 @@ main.PROJECT <- "BrainMet_SeuratV5"
 
 cluster.resolution <- 0.5
 path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
-path.to.02.output <- file.path(path.to.main.output, "02_output_test")
-path.to.03.output <- file.path(path.to.main.output, "03_output_test")
-path.to.06.output <- file.path(path.to.main.output, sprintf("06_output_test_%s", cluster.resolution))
+path.to.02.output <- file.path(path.to.main.output, "02_output")
+path.to.03.output <- file.path(path.to.main.output, "03_output")
+path.to.06.output <- file.path(path.to.main.output, sprintf("06_output_%s", cluster.resolution))
 
 path.to.sobj <- file.path(path.to.06.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))
 # path.to.sobj <- file.path(path.to.03.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))
