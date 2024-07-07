@@ -1,5 +1,5 @@
 ---
-title: "Downstream analysis on integrated dataset, `r basename(params$path.to.sobj)`"
+title: "Downstream analysis on integrated dataset"
 author:
   - "trnguyen@ukaachen.de"
 date: "Last update on `r format(Sys.time(), '%d %B, %Y')`"
@@ -15,6 +15,7 @@ output:
     theme: lumen
 params:
   path.to.sobj: NA
+  cluster.resolution: NA
 ---
 
 
@@ -67,17 +68,10 @@ integrated.version <- "v0.2"
 outdir <- "/media/hieunguyen/HNSD01/outdir"
 main.PROJECT <- "BrainMet_SeuratV5"
 
-# cluster.resolution <- params$cluster.resolution
-# path.to.sobj <- params$path.to.sobj
+path.to.sobj <- params$path.to.sobj
+cluster.resolution <- params$cluster.resolution
 
-cluster.resolution <- 0.5
 path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
-path.to.02.output <- file.path(path.to.main.output, "02_output")
-path.to.03.output <- file.path(path.to.main.output, "03_output")
-path.to.06.output <- file.path(path.to.main.output, sprintf("06_output_%s", cluster.resolution))
-
-path.to.sobj <- file.path(path.to.06.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))
-# path.to.sobj <- file.path(path.to.03.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))
   
 if (grepl("03_output", path.to.sobj) == TRUE){
   object.save.name <- "all_cells"
@@ -85,7 +79,7 @@ if (grepl("03_output", path.to.sobj) == TRUE){
   object.save.name <- "immune_cells_CD45_only"
 }
 
-path.to.04.output <- file.path(path.to.main.output, "04_output_test", object.save.name)
+path.to.04.output <- dirname(path.to.sobj)
 dir.create(path.to.04.output, showWarnings = FALSE, recursive = TRUE)
 
 s.obj <- readRDS(path.to.sobj)
@@ -100,13 +94,13 @@ topN <- 10
 # for (reduction.method in c("cca", "rpca", "harmony")){
 for (reduction.method in c("harmony")){
   cat(sprintf("### Reduction method %s \n", reduction.method))
-  p <- DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label = TRUE, label.box = TRUE, repel = TRUE, group.by = sprintf("%s.cluster.0.5", reduction.method))  
+  p <- DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label = TRUE, label.box = TRUE, repel = TRUE, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution))  
   print(p)
   cat("\n \n")
 }
 
 reduction.method <- "harmony"
-Idents(s.obj) <- "harmony.cluster.0.5"
+Idents(s.obj) <- sprintf("harmony.cluster.%s", cluster.resolution)
 ```
 
 # Cluster marker genes
@@ -114,7 +108,7 @@ Idents(s.obj) <- "harmony.cluster.0.5"
 Identify differentially expressed genes in each cluster. 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='hide', fig.height=10, fig.width=18}
 min.pct <- 0.5
-Idents(s.obj) <- sprintf("%s.cluster.0.5", reduction.method)
+Idents(s.obj) <- sprintf("%s.cluster.%s", reduction.method, cluster.resolution)
 if (file.exists(file.path(path.to.04.output, sprintf("DE_cluster_marker_genes_min_pct_%s_reduction_method_%s.rds", min.pct, reduction.method))) == FALSE){
   print("Start preparation for find all markers ...")
   DefaultAssay(s.obj) <- "SCT"
@@ -147,7 +141,7 @@ for (cluster.id in sort(unique(cluster.markers$cluster))){
   DefaultAssay(s.obj) <- "SCT"
   cat(sprintf("### Cluster %s \n", cluster.id))
   tmp.cluster.markers <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
-  p <- DotPlot(object = s.obj, features = head(tmp.cluster.markers, 9)$gene, group.by = sprintf("%s.cluster.0.5", reduction.method))  
+  p <- DotPlot(object = s.obj, features = head(tmp.cluster.markers, 9)$gene, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution))  
   print(p)
   cat("\n \n")
 }
@@ -159,7 +153,7 @@ for (cluster.id in sort(unique(cluster.markers$cluster))){
   DefaultAssay(s.obj) <- "SCT"
   cat(sprintf("### Cluster %s \n", cluster.id))
   tmp.cluster.markers <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
-  p <- VlnPlot(object = s.obj, features = head(tmp.cluster.markers, 9)$gene, slot = "data",  group.by = sprintf("%s.cluster.0.5", reduction.method), pt.size = 0)  
+  p <- VlnPlot(object = s.obj, features = head(tmp.cluster.markers, 9)$gene, slot = "data",  group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), pt.size = 0)  
   print(p)
   cat("\n \n")
 }
@@ -171,7 +165,7 @@ cluster.markers %>% create_dt()
 ```
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
-all.cluster.ids <- sort(unique(s.obj$harmony.cluster.0.5))
+all.cluster.ids <- sort(unique(s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]))
 for (cluster.id in all.cluster.ids){
   tmp.table <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC))
   cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
@@ -197,7 +191,7 @@ for (cluster.id in all.cluster.ids){
 
 # Number of cells in each cluster in each sample
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-cell.count.in.clusters <- table(s.obj$name, s.obj$harmony.cluster.0.5) %>% as.data.frame() %>%
+cell.count.in.clusters <- table(s.obj$name, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]) %>% as.data.frame() %>%
   pivot_wider(names_from = "Var2", values_from = "Freq") 
 cell.count.in.clusters %>% create_dt()
 ```
@@ -324,8 +318,8 @@ top5.annotationdf %>% create_dt()
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
 meta.data <- s.obj@meta.data %>% rownames_to_column("barcode") %>%
   rowwise() %>%
-  mutate(prediction2 = ifelse(nrow(subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)) != 0, 
-                              subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)$annotation,
+  mutate(prediction2 = ifelse(nrow(subset(annotationdf, annotationdf$cluster.id == sprintf("harmony.cluster.%s", cluster.resolution))) != 0, 
+                              subset(annotationdf, annotationdf$cluster.id == sprintf("harmony.cluster.%s", cluster.resolution))$annotation,
                               "None")) %>%
   column_to_rownames("barcode")
 meta.data <- meta.data[row.names(s.obj@meta.data),]
@@ -341,10 +335,10 @@ table(s.obj$prediction2, s.obj$name) %>% as.data.frame() %>% pivot_wider(names_f
 
 # Number of cells in each cluster
 ```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
-count.cell.in.cluster <- s.obj@meta.data %>% subset(select = c(name, harmony.cluster.0.5)) %>% table() %>% as.data.frame()
+count.cell.in.cluster <- s.obj@meta.data[, c("name", sprintf("harmony.cluster.%s", cluster.resolution))] %>% table() %>% as.data.frame()
 count.cell.in.cluster.wider <- count.cell.in.cluster %>% pivot_wider(names_from = "name", values_from = "Freq") 
 
-pct.table <- count.cell.in.cluster.wider %>% column_to_rownames(sprintf("%s.cluster.0.5", reduction.method))
+pct.table <- count.cell.in.cluster.wider %>% column_to_rownames(sprintf("%s.cluster.%s", reduction.method, cluster.resolution))
 colsum.table <- colSums(pct.table)
 rowsum.table <- rowSums(pct.table)
 names(rowsum.table) <- to_vec(for (item in names(rowsum.table)) sprintf("cluster_%s", item))
@@ -382,12 +376,12 @@ pct.table.cluster %>% create_dt()
 
 ### Raw counts
 ```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
-p <- count.cell.in.cluster %>% ggplot(aes(x = harmony.cluster.0.5, y = Freq, fill = name)) + geom_bar(stat = "identity", dodge = "stack")
+p <- count.cell.in.cluster %>% ggplot(aes_string(x = sprintf("harmony.cluster.%s", cluster.resolution), y = "Freq", fill = "name")) + geom_bar(stat = "identity", dodge = "stack")
 ggplotly(p)
 ```
 
 ```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
-p <- count.cell.in.cluster %>% ggplot(aes(x = name, y = Freq, fill = harmony.cluster.0.5)) + geom_bar(stat = "identity", dodge = "stack") + 
+p <- count.cell.in.cluster %>% ggplot(aes_string(x = "name", y = "Freq", fill = sprintf("harmony.cluster.%s", cluster.resolution))) + geom_bar(stat = "identity", dodge = "stack") + 
   theme(axis.text.x = element_text(angle = 90))
 ggplotly(p)
 ```
@@ -395,11 +389,13 @@ ggplotly(p)
 ### Percentages
 
 ```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
-pct.table.sample.longer <- pct.table.sample %>% rownames_to_column(sprintf("%s.cluster.0.5", reduction.method)) %>% 
-  pivot_longer(!harmony.cluster.0.5, names_to = "name", values_to = "Freq")
-pct.table.sample.longer$harmony.cluster.0.5 <- factor(pct.table.sample.longer$harmony.cluster.0.5, levels = seq(0, length(unique(pct.table.sample.longer$harmony.cluster.0.5)) - 1))
+pct.table.sample.longer <- pct.table.sample %>% rownames_to_column(sprintf("%s.cluster.%s", reduction.method, cluster.resolution)) %>% 
+  pivot_longer(cols = setdiff(colnames(pct.table.sample), sprintf("harmony.cluster.%s", cluster.resolution)), names_to = "name", values_to = "Freq")
+
+pct.table.sample.longer[[sprintf("harmony.cluster.%s", cluster.resolution)]] <- factor(pct.table.sample.longer[[sprintf("harmony.cluster.%s", cluster.resolution)]], levels = seq(0, length(unique(pct.table.sample.longer[[sprintf("harmony.cluster.%s", cluster.resolution)]])) - 1))
+
 p <- pct.table.sample.longer  %>% 
-  ggplot(aes(x = name, y = Freq, fill = harmony.cluster.0.5)) + geom_bar(stat = "identity", dodge = "stack") + 
+  ggplot(aes_string(x = "name", y = "Freq", fill = sprintf("harmony.cluster.%s", cluster.resolution))) + geom_bar(stat = "identity", dodge = "stack") + 
   theme(axis.text.x = element_text(angle = 90))
 ggplotly(p)
 ```
@@ -407,10 +403,10 @@ ggplotly(p)
 
 ```{r results='asis', echo=FALSE, message=FALSE, warning=FALSE, fig.width=14, fig.height=10}
 pct.table.cluster.longer <- pct.table.cluster %>% rownames_to_column("name") %>% 
-  pivot_longer(!name, names_to = sprintf("%s.cluster.0.5", reduction.method), values_to = "Freq")
+  pivot_longer(!name, names_to = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), values_to = "Freq")
 
 p <- pct.table.cluster.longer  %>% 
-  ggplot(aes(x = harmony.cluster.0.5, y = Freq, fill = name)) + geom_bar(stat = "identity", dodge = "stack") + 
+  ggplot(aes_string(x = sprintf("harmony.cluster.%s", cluster.resolution), y = "Freq", fill = "name")) + geom_bar(stat = "identity", dodge = "stack") + 
   theme(axis.text.x = element_text(angle = 90))
 ggplotly(p)
 ```
@@ -445,7 +441,7 @@ for (gene.id in tk.gene.set){
     ggsave(plot = p.celltype, filename = sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))
   }
   if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_clusters.png", gene.id))) == FALSE){
-    p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.0.5", reduction.method), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
+    p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
     ggsave(plot = p.clusters, filename = sprintf("violin_plot_group_%s_clusters.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))    
   }
 }
@@ -457,11 +453,12 @@ if (file.exists(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_E
   s.obj <- PrepSCTFindMarkers(s.obj)
   diff.markers <- hash()
   diff.markers.raw <- hash()
-  count.cells.in.clusters <- table(s.obj$group, s.obj$harmony.cluster.0.5) %>% as.data.frame()
-  for (cluster.id in unique(s.obj$harmony.cluster.0.5)){
+  count.cells.in.clusters <- table(s.obj$group, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]) %>% as.data.frame()
+  for (cluster.id in unique(s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]])){
     count.control.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "Control Epilepsy")$Freq
     count.BrMet.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "BrainMet")$Freq
-    tmp.s.obj <- subset(s.obj, harmony.cluster.0.5 == cluster.id)
+    selected.cells <- subset(s.obj@meta.data, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]] == cluster.id) %>% row.names()
+    tmp.s.obj <- subset(s.obj, cells = selected.cells)
     if (count.control.cells >= 10 & count.BrMet.cells >= 10){
         diff.markers.raw[[cluster.id]] <- FindMarkers(object = tmp.s.obj, ident.1 = "BrainMet", ident.2 = "Control Epilepsy", group.by = "group", assay = "SCT", recorrect_umi = FALSE) 
         diff.markers[[cluster.id]] <- diff.markers.raw[[cluster.id]]%>%
@@ -554,11 +551,12 @@ if (file.exists(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_G
   s.obj <- PrepSCTFindMarkers(s.obj)
   diff.markers <- hash()
   diff.markers.raw <- hash()
-  count.cells.in.clusters <- table(s.obj$group, s.obj$harmony.cluster.0.5) %>% as.data.frame()
-  for (cluster.id in unique(s.obj$harmony.cluster.0.5)){
+  count.cells.in.clusters <- table(s.obj$group, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]) %>% as.data.frame()
+  for (cluster.id in unique(s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]])){
     count.control.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "Control Glioma")$Freq
     count.BrMet.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "BrainMet")$Freq
-    tmp.s.obj <- subset(s.obj, harmony.cluster.0.5 == cluster.id)
+    selected.cells <- subset(s.obj@meta.data, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]] == cluster.id) %>% row.names()
+    tmp.s.obj <- subset(s.obj, cells = selected.cells)
     if (count.control.cells >= 10 & count.BrMet.cells >= 10){
       diff.markers.raw[[cluster.id]] <- FindMarkers(object = tmp.s.obj, ident.1 = "BrainMet", ident.2 = "Control Glioma", group.by = "group", assay = "SCT", recorrect_umi = FALSE) 
       diff.markers[[cluster.id]] <- diff.markers.raw[[cluster.id]]%>%
@@ -648,7 +646,7 @@ for (cluster.id in names(diff.markers)){
 # Cell type marker genes (update 16.06.2024)
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-path.to.project.src <- "/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq/20240601"
+path.to.project.src <- "/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq/integrate_BrainMet_datasets"
 celltype.markers <- readxl::read_excel(file.path(path.to.project.src, "cell_type_markers_20240616.xlsx"))
 markerdb <- data.frame()
 for (col in colnames(celltype.markers)){
@@ -684,6 +682,7 @@ annotate_with_pathway_custom_db <- function(cluster.id, inputdb, topN = 20){
   return(x)  
 }
 ```
+
 ## Annotation results based on new cell type markers {.tabset}
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
 annotationdf <- data.frame()
@@ -740,10 +739,12 @@ top5.annotationdf %>% create_dt()
 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-meta.data <- s.obj@meta.data %>% rownames_to_column("barcode") %>%
+meta.data <- s.obj@meta.data %>% rownames_to_column("barcode") 
+meta.data$selected.cluster <- meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]
+meta.data <- meta.data %>%
   rowwise() %>%
-  mutate(prediction3 = ifelse(nrow(subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)) != 0, 
-                              subset(annotationdf, annotationdf$cluster.id == harmony.cluster.0.5)$annotation,
+  mutate(prediction3 = ifelse(nrow(subset(annotationdf, annotationdf$cluster.id == selected.cluster)) != 0, 
+                              subset(annotationdf, annotationdf$cluster.id == selected.cluster)$annotation,
                               "None")) %>%
   column_to_rownames("barcode")
 meta.data <- meta.data[row.names(s.obj@meta.data),]
