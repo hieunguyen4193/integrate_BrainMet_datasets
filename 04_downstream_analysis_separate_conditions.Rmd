@@ -62,7 +62,6 @@ source(file.path(path.to.pipeline.src, "processes_src", "import_libraries.R"))
 source(file.path(path.to.pipeline.src, "processes_src", "helper_functions.R"))
 
 path.to.main.src <- file.path("/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq", code.version)
-all.integrated.metadata <- list(v0.1 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240513.csv")))
 
 integrated.version <- "v0.2"
 outdir <- "/media/hieunguyen/HNSD01/outdir"
@@ -70,6 +69,9 @@ main.PROJECT <- "BrainMet_SeuratV5"
 
 path.to.sobj <- params$path.to.sobj
 cluster.resolution <- params$cluster.resolution
+
+# path.to.sobj <- "/media/hieunguyen/HNSD01/outdir/BrainMet_SeuratV5/integrate_BrainMet_datasets/integrated_v0.2/09_output/s8_output/integrated_BrainMet_dataset.output.s8.rds"
+# cluster.resolution <- 0.5
 
 path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
   
@@ -428,213 +430,21 @@ s.obj <- AddMetaData(object = s.obj, metadata = meta.data$group, col.name = "gro
 tk.gene.set <- read.csv("/media/hieunguyen/HNHD01/data/UKK/geneSet/TK_genes.csv")$TK_gene
 tk.gene.set.split <- split(tk.gene.set, seq(1, 22))
 
-dir.create(file.path(path.to.04.output, "TK_genes"), showWarnings = FALSE, recursive = TRUE)
-for (gene.id in tk.gene.set){
-  if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id))) == FALSE){
-    p.celltype <- VlnPlot(object = s.obj, group.by = "prediction2", features = c(gene.id), split.by = "group", pt.size = 0)
-    ggsave(plot = p.celltype, filename = sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))
-  }
-  if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_clusters.png", gene.id))) == FALSE){
-    p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
-    ggsave(plot = p.clusters, filename = sprintf("violin_plot_group_%s_clusters.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))    
-  }
-}
-```
-
-# Differential gene expression analysis between "BrainMet" and "Control Epilepsy"
-```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-if (file.exists(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.rds")) == FALSE){
-  s.obj <- PrepSCTFindMarkers(s.obj)
-  diff.markers <- hash()
-  diff.markers.raw <- hash()
-  count.cells.in.clusters <- table(s.obj$group, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]) %>% as.data.frame()
-  for (cluster.id in unique(s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]])){
-    count.control.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "Control Epilepsy")$Freq
-    count.BrMet.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "BrainMet")$Freq
-    selected.cells <- subset(s.obj@meta.data, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]] == cluster.id) %>% row.names()
-    tmp.s.obj <- subset(s.obj, cells = selected.cells)
-    if (count.control.cells >= 10 & count.BrMet.cells >= 10){
-        diff.markers.raw[[cluster.id]] <- FindMarkers(object = tmp.s.obj, ident.1 = "BrainMet", ident.2 = "Control Epilepsy", group.by = "group", assay = "SCT", recorrect_umi = FALSE) 
-        diff.markers[[cluster.id]] <- diff.markers.raw[[cluster.id]]%>%
-          subset(p_val_adj <= 0.05) %>% 
-          rownames_to_column("Gene") %>% 
-          rowwise() %>%
-          mutate(abs.logFC = abs(avg_log2FC)) %>% arrange(desc(abs.logFC))      
-    } else {
-      diff.markers.raw[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
-      diff.markers[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
+if (file.exists(file.path(path.to.04.output, "finished_saving_TK_genes.csv")) == FALSE){
+  dir.create(file.path(path.to.04.output, "TK_genes"), showWarnings = FALSE, recursive = TRUE)
+  for (gene.id in tk.gene.set){
+    if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id))) == FALSE){
+      p.celltype <- VlnPlot(object = s.obj, group.by = "prediction2", features = c(gene.id), split.by = "group", pt.size = 0)
+      ggsave(plot = p.celltype, filename = sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))
     }
-  }
-  saveRDS(diff.markers.raw, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.raw.rds"))
-  saveRDS(diff.markers, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.rds"))
-} else {
-  diff.markers <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.rds"))
-  diff.markers.raw <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Epilepsy.raw.rds"))
-}
-```
-
-## Full tables of DE genes {.tabset}
-```{r echo=FALSE, results='asis', include=FALSE}
-diff.markers$`1` %>% create_dt()
-```
-
-```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
-for (cluster.id in names(diff.markers)){
-  tmp.table <- diff.markers[[cluster.id]]
-  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
-  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
-                                      filter = "top",
-                                      options = list(dom = 'Blfrtip',
-                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
-                                                     lengthMenu = list(c(10,25,50,-1),
-                                                                       c(10,25,50,"All")),
-                                                     columnDefs = list(list(
-                                                       targets = "_all",
-                                                       render = JS(
-                                                         "function(data, type, row, meta) {",
-                                                         "return type === 'display' && data != null && data.length > 100 ?",
-                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
-                                                         "}")
-                                                     ))
-                                      ))))
-  cat("\n \n")  
-}
-```
-
-## Volcano plot {.tabset}
-
-- Positive logFC indicates that the gene is "up" in Brain Met.
-
-- Negative logFC indicates that the gene is "up" in Control
-
-```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-for (cluster.id in names(diff.markers)){
-  cat(sprintf("### Cluster %s \n", cluster.id))
-  input.df <- diff.markers.raw[[cluster.id]] %>% rownames_to_column("Gene")
-  if ("status" %in% colnames(input.df) == FALSE & nrow(input.df) != 0){
-    top10up.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC > 1) %>% arrange(desc(avg_log2FC)) %>% head(10)
-    top10down.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC < -1) %>% arrange(desc(avg_log2FC)) %>% tail(10)
-    input.df <- input.df %>%
-    rowwise() %>%
-    mutate(sig = ifelse(p_val_adj <= 0.05, "Sig.", "not Sig.")) %>%
-      mutate(show.gene.name = ifelse(Gene %in% c(top10up.genes$Gene, top10down.genes$Gene), Gene, NA))
-    
-    cutoff.adjp <- 0.05
-    volcano.plot <- ggplot(data=input.df, 
-                            aes(x=avg_log2FC, y=-log10(p_val_adj), col = sig, label=Gene)) + 
-                            geom_point() + geom_label_repel(label = input.df$show.gene.name, size = 8) + 
-                            scale_color_manual(values=c("#c0d2f0", "#f28095")) +
-                            theme_minimal() +
-                            geom_vline(xintercept=c(-1, 1), col="#9a9fa6", linetype='dotted') +
-                            geom_hline(yintercept=-log10(cutoff.adjp), col="#9a9fa6", linetype='dotted') +
-                            #geom_text() +
-                          theme_bw() + 
-                          theme(plot.title = element_text(hjust=0.5, face="bold", size = 12), axis.text=element_text(size=12))
-    
-  } else {
-    volcano.plot <- ggplot() + ggtitle("Not enough cells to conduct DE test")
-  }
-  print(volcano.plot)
-  cat("\n \n")
-}
-```
-
-# Differential gene expression analysis between "BrainMet" and "Control Glioma"
-```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-if (file.exists(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.rds")) == FALSE){
-  s.obj <- PrepSCTFindMarkers(s.obj)
-  diff.markers <- hash()
-  diff.markers.raw <- hash()
-  count.cells.in.clusters <- table(s.obj$group, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]]) %>% as.data.frame()
-  for (cluster.id in unique(s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]])){
-    count.control.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "Control Glioma")$Freq
-    count.BrMet.cells <- subset(count.cells.in.clusters, count.cells.in.clusters$Var2 == cluster.id & count.cells.in.clusters$Var1 == "BrainMet")$Freq
-    selected.cells <- subset(s.obj@meta.data, s.obj@meta.data[[sprintf("harmony.cluster.%s", cluster.resolution)]] == cluster.id) %>% row.names()
-    tmp.s.obj <- subset(s.obj, cells = selected.cells)
-    if (count.control.cells >= 10 & count.BrMet.cells >= 10){
-      diff.markers.raw[[cluster.id]] <- FindMarkers(object = tmp.s.obj, ident.1 = "BrainMet", ident.2 = "Control Glioma", group.by = "group", assay = "SCT", recorrect_umi = FALSE) 
-      diff.markers[[cluster.id]] <- diff.markers.raw[[cluster.id]]%>%
-        subset(p_val_adj <= 0.05) %>% 
-        rownames_to_column("Gene") %>% 
-        rowwise() %>%
-        mutate(abs.logFC = abs(avg_log2FC)) %>% arrange(desc(abs.logFC))      
-    } else {
-      diff.markers.raw[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
-      diff.markers[[cluster.id]] <- data.frame(status = c("Not enough cells to conduct DE test"))
+    if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_clusters.png", gene.id))) == FALSE){
+      p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
+      ggsave(plot = p.clusters, filename = sprintf("violin_plot_group_%s_clusters.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))    
     }
-  }
-  saveRDS(diff.markers.raw, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.raw.rds"))
-  saveRDS(diff.markers, file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.rds"))
-} else {
-  diff.markers <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.rds"))
-  diff.markers.raw <- readRDS(file.path(path.to.04.output, "diff.markers_BrainMet_vs_Control_Glioma.raw.rds"))
+  }  
+  write.csv(data.frame(status = c("finished saving TK genes")), file.path(path.to.04.output, "finished_saving_TK_genes.csv"))
 }
-```
 
-## Full tables of DE genes {.tabset}
-```{r echo=FALSE, results='asis', include=FALSE}
-diff.markers$`1` %>% create_dt()
-```
-
-```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=20, fig.height=12}
-for (cluster.id in names(diff.markers)){
-  tmp.table <- diff.markers[[cluster.id]]
-  cat(paste("\n\n### Cluster: ", cluster.id, "##\n"))
-  print( htmltools::tagList(datatable(tmp.table, extensions = 'Buttons',
-                                      filter = "top",
-                                      options = list(dom = 'Blfrtip',
-                                                     buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
-                                                     lengthMenu = list(c(10,25,50,-1),
-                                                                       c(10,25,50,"All")),
-                                                     columnDefs = list(list(
-                                                       targets = "_all",
-                                                       render = JS(
-                                                         "function(data, type, row, meta) {",
-                                                         "return type === 'display' && data != null && data.length > 100 ?",
-                                                         "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
-                                                         "}")
-                                                     ))
-                                      ))))
-  cat("\n \n")  
-}
-```
-
-## Volcano plot {.tabset}
-
-- Positive logFC indicates that the gene is "up" in Brain Met.
-
-- Negative logFC indicates that the gene is "up" in Control
-
-```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-for (cluster.id in names(diff.markers)){
-  cat(sprintf("### Cluster %s \n", cluster.id))
-  input.df <- diff.markers.raw[[cluster.id]] %>% rownames_to_column("Gene")
-  if ("status" %in% colnames(input.df) == FALSE & nrow(input.df) != 0){
-    top10up.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC > 1) %>% arrange(desc(avg_log2FC)) %>% head(10)
-    top10down.genes <- input.df %>% subset(p_val_adj <= 0.05 & avg_log2FC < -1) %>% arrange(desc(avg_log2FC)) %>% tail(10)
-    input.df <- input.df %>%
-      rowwise() %>%
-      mutate(sig = ifelse(p_val_adj <= 0.05, "Sig.", "not Sig.")) %>%
-      mutate(show.gene.name = ifelse(Gene %in% c(top10up.genes$Gene, top10down.genes$Gene), Gene, NA))
-    
-    cutoff.adjp <- 0.05
-    volcano.plot <- ggplot(data=input.df, 
-                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = sig, label=Gene)) + 
-      geom_point() + geom_label_repel(label = input.df$show.gene.name, size = 8) + 
-      scale_color_manual(values=c("#c0d2f0", "#f28095")) +
-      theme_minimal() +
-      geom_vline(xintercept=c(-1, 1), col="#9a9fa6", linetype='dotted') +
-      geom_hline(yintercept=-log10(cutoff.adjp), col="#9a9fa6", linetype='dotted') +
-      #geom_text() +
-      theme_bw() + 
-      theme(plot.title = element_text(hjust=0.5, face="bold", size = 12), axis.text=element_text(size=12))
-    
-  } else {
-    volcano.plot <- ggplot() + ggtitle("Not enough cells to conduct DE test")
-  }
-  print(volcano.plot)
-  cat("\n \n")
-}
 ```
 
 # Cell type marker genes (update 16.06.2024)
@@ -753,28 +563,43 @@ DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label.
 ##### Generate violin plot and umap for each gene in each cell type marker genes
 #####----------------------------------------------------------------------#####
 DefaultAssay(s.obj) <- "SCT"
-for (cell.type in unique(markerdb$cell_name)){
-  dir.create(file.path(path.to.04.output, "celltype_markers", cell.type), showWarnings = FALSE, recursive = TRUE)
-  tmp.marker.genes <- subset(markerdb, markerdb$cell_name == cell.type)$GeneID
-  tmp.marker.genes <- tmp.marker.genes[is.na(tmp.marker.genes) == FALSE]
-  
-  for (gene.id in intersect(tmp.marker.genes, row.names(s.obj))){
-    if (file.exists(file.path(path.to.04.output, "celltype_markers", cell.type, sprintf("Celltype_%s_gene_%s.svg", cell.type, gene.id))) == FALSE){
-      # print(sprintf("Working on cell type %s, gene.id %s", cell.type, gene.id))
-      umap.plot <- FeaturePlot(object = s.obj, reduction = "harmony_UMAP", features = c(gene.id), label = TRUE, slot = "data")
-      vln.plot <- VlnPlot(object = s.obj, features = c(gene.id), slot = "data", assay = "SCT")
-      p <- umap.plot + vln.plot
-      ggsave(plot = p, filename = sprintf("Celltype_%s_gene_%s.png", cell.type, gene.id), 
-             path = file.path(path.to.04.output, "celltype_markers", cell.type), 
-             width = 14, 
-             height = 20,
-             device = "png")
-    } else {
-      # print("file exists")
-    }
-  }  
+
+if (file.exists(file.path(path.to.04.output, "finished_saving_cell_marker_genes.csv")) = FALSE){
+  for (cell.type in unique(markerdb$cell_name)){
+    dir.create(file.path(path.to.04.output, "celltype_markers", cell.type), showWarnings = FALSE, recursive = TRUE)
+    tmp.marker.genes <- subset(markerdb, markerdb$cell_name == cell.type)$GeneID
+    tmp.marker.genes <- tmp.marker.genes[is.na(tmp.marker.genes) == FALSE]
+    
+    for (gene.id in intersect(tmp.marker.genes, row.names(s.obj))){
+      if (file.exists(file.path(path.to.04.output, "celltype_markers", cell.type, sprintf("Celltype_%s_gene_%s.svg", cell.type, gene.id))) == FALSE){
+        # print(sprintf("Working on cell type %s, gene.id %s", cell.type, gene.id))
+        umap.plot <- FeaturePlot(object = s.obj, reduction = "harmony_UMAP", features = c(gene.id), label = TRUE, slot = "data")
+        vln.plot <- VlnPlot(object = s.obj, features = c(gene.id), slot = "data", assay = "SCT")
+        p <- umap.plot + vln.plot
+        ggsave(plot = p, filename = sprintf("Celltype_%s_gene_%s.png", cell.type, gene.id), 
+               path = file.path(path.to.04.output, "celltype_markers", cell.type), 
+               width = 14, 
+               height = 20,
+               device = "png")
+      } else {
+        # print("file exists")
+      }
+    }  
+  }
+  write.csv(data.frame(status = c("finished saving cell marker genes")), file.path(path.to.04.output, "finished_saving_cell_marker_genes.csv"))
 }
 
+```
+
+# Marker genes for Microglia and MDM
+
+## UMAP
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+FeaturePlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label = TRUE, repel = TRUE, features = c("ITGA4", "THBD", "ICAM1"))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
+VlnPlot(object = s.obj, features = c("ITGA4", "THBD", "ICAM1"), ncol = 2)
 ```
 
 

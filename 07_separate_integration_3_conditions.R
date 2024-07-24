@@ -43,7 +43,8 @@ for (input.condition in unique(sample.metadata$Group)){
       selected.cells.PTPRC <- readRDS(file.path(path.to.06.output, "selected.cells.PTPRC.rds"))
     }
     
-    s.obj <- subset(s.obj, cells = selected.cells.PTPRC & name %in% input.samples) 
+    s.obj <- subset(s.obj, cells = selected.cells.PTPRC)
+    s.obj <- subset(s.obj, name %in% input.samples)
     
     num.PCA <- 25
     num.PC.used.in.UMAP <- 25
