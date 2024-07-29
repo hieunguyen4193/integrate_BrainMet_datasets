@@ -23,12 +23,12 @@ path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("in
 path.to.09.output <- file.path(path.to.main.output, "09_output")
 path.to.10.output <- file.path(path.to.main.output, "10_output")
 path.to.11.output <- file.path(path.to.main.output, "11_output")
-path.to.12.output <- file.path(path.to.main.output, "12_output")
-dir.create(path.to.12.output, showWarnings = FALSE, recursive = TRUE)
+path.to.13.output <- file.path(path.to.main.output, "13_output")
+dir.create(path.to.13.output, showWarnings = FALSE, recursive = TRUE)
 
-if (file.exists(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds")) == FALSE){
-  s.obj.GSE193745 <- readRDS(file.path(path.to.11.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
-  s.obj.prev <- readRDS(file.path(path.to.09.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
+if (file.exists(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds")) == FALSE){
+  s.obj.GSE193745 <- readRDS(file.path(path.to.10.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
+  s.obj.prev <- readRDS(file.path(path.to.03.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
   
   selected.cells <- c(colnames(s.obj.GSE193745), colnames(s.obj.prev))
   
@@ -63,7 +63,7 @@ if (file.exists(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_d
   
   s.obj.integrated <- s8.integration.and.clustering_V5(s.obj = s.obj, 
                                                        save.RDS.s8 = TRUE,
-                                                       path.to.output = path.to.12.output,
+                                                       path.to.output = path.to.13.output,
                                                        use.sctransform = TRUE,
                                                        num.PCA = num.PCA,
                                                        num.PC.used.in.UMAP = num.PC.used.in.UMAP,
@@ -72,7 +72,7 @@ if (file.exists(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_d
                                                        vars.to.regress = vars.to.regress)  
   
 } else {
-  s.obj.integrated <- readRDS(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds"))
+  s.obj.integrated <- readRDS(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds"))
 }
 
 

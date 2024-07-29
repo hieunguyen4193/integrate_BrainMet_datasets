@@ -1,7 +1,6 @@
 gc()
 rm(list = ls())
 
-
 path.to.pipeline.src <- "/media/hieunguyen/HNSD01/src/src_pipeline/scRNA_GEX_pipeline_SeuratV5"
 
 source(file.path(path.to.pipeline.src, "processes_src", "import_libraries.R"))
@@ -84,36 +83,5 @@ path.to.03.output <- file.path(path.to.main.output, "03_output")
 #                     output_file = save.html.name,
 #                     output_dir = path.to.save.html)
 # }
-
-
-##### running data analysis 04 template for 10 output data
-
-path.to.10.output <- file.path(path.to.main.output, "09_output")
-
-cluster.resolution <- 0.5
-input.path.to.sobj <- file.path(path.to.10.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds")
-
-path.to.save.html <- file.path(outdir, "BrainMet_SeuratV5", output.version, "html_outputs")
-dir.create(file.path(path.to.save.html), showWarnings = FALSE, recursive = TRUE)
-
-if (grepl("03_output", input.path.to.sobj) == TRUE){
-  save.html.name <- "all_cells.html"
-} else if (grepl("06_output", input.path.to.sobj) == TRUE){
-  save.html.name <- sprintf("immune_cells_CD45_only.clusterRes_%s.html", cluster.resolution)
-} else if (grepl("07_output", input.path.to.sobj) == TRUE){
-  save.html.name <- sprintf("immune_cells_CD45_only_condition_%s.clusterRes_%s.html", input.condition, cluster.resolution)
-} else if (grepl("09_output", input.path.to.sobj) == TRUE){
-  save.html.name <- sprintf("immune_cells_CD45_only.clusterRes_%s.filtered.html", cluster.resolution)
-} else if (grepl("10_output", input.path.to.sobj) == TRUE){
-  save.html.name <- sprintf("immune_cells_CD45_only.clusterRes_%s.filtered.html", cluster.resolution)
-}
-if (file.exists(file.path(path.to.save.html, save.html.name)) == FALSE){
-  rmarkdown::render(path.to.rmd,
-                    params = list(
-                      path.to.sobj = input.path.to.sobj,
-                      cluster.resolution = cluster.resolution),
-                    output_file = save.html.name,
-                    output_dir = path.to.save.html)
-}
 
 
