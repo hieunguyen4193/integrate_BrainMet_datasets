@@ -10,10 +10,12 @@ source(file.path(path.to.pipeline.src, "processes_src", "helper_functions.R"))
 library(Matrix)
 path.to.main.src <- file.path("/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq", code.version)
 all.integrated.metadata <- list(v0.1 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240513.csv")),
-                                v0.2 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240620.csv")))
+                                v0.2 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240620.csv")),
+                                v0.3 = read.csv(file.path(path.to.main.src, "samples_to_integrated_20240725.csv")))
 
 # integrated.version <- "v0.1"
-integrated.version <- "v0.2"
+# integrated.version <- "v0.2"
+integrated.version <- "v0.3"
 
 #####----------------------------------------------------------------------#####
 # CONFIGURATIONS AND PREPRATIONS
@@ -55,17 +57,11 @@ if (file.exists(file.path(path.to.02.output, "list_of_all_samples_sobj.rds")) ==
       meta.data <- meta.data[row.names(data.list[[sample.id]]@meta.data),]
       
       ##### FILTER!!!!
-      if (integrated.version == "v0.1"){
-        data.list[[sample.id]] <- subset(data.list[[sample.id]], 
-                                         nCount_RNA >= 500 & 
-                                           nFeature_RNA >= 300 & 
-                                           log10(nFeature_RNA) / log10(nCount_RNA) >= 0.85)        
-      } else if (integrated.version == "v0.2") {
-        data.list[[sample.id]] <- subset(data.list[[sample.id]], 
-                                         nCount_RNA >= 500 & 
-                                           nFeature_RNA >= 300 & 
-                                           log10(nFeature_RNA) / log10(nCount_RNA) >= 0.85)        
-      }
+      data.list[[sample.id]] <- subset(data.list[[sample.id]], 
+                                       nCount_RNA >= 500 & 
+                                         nFeature_RNA >= 300 & 
+                                         log10(nFeature_RNA) / log10(nCount_RNA) >= 0.85)
+      
       data.list[[sample.id]] <- AddMetaData(object = data.list[[sample.id]], metadata = meta.data$sample.id, col.name = "name")
       print(sprintf("dataset size: %s", paste(dim(data.list[[sample.id]]), collapse = ", ")))
     }

@@ -21,6 +21,47 @@ main.PROJECT <- "BrainMet_SeuratV5"
 
 path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
 path.to.10.output <- file.path(path.to.main.output, "10_output")
-dir.create(path.to.10.output, showWarnings = FALSE, recursive = TRUE)
 
-s.obj.integrated <- readRDS(file.path(path.to.10.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
+path.to.11.output <- file.path(path.to.main.output, "11_output")
+dir.create(path.to.11.output, showWarnings = FALSE, recursive = TRUE)
+
+s.obj <- readRDS(file.path(path.to.10.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
+
+if (file.exists(file.path(path.to.11.output, "selected.cells.PTPRC.rds")) == FALSE){
+  count.PTPRC <- GetAssayData(object = s.obj.integrated, slot = "data", assay = "SCT")["PTPRC", ] 
+  selected.cells.PTPRC <- count.PTPRC[count.PTPRC != 0] %>% names()
+  saveRDS(selected.cells.PTPRC, file.path(path.to.11.output, "selected.cells.PTPRC.rds"))
+} else {
+  selected.cells.PTPRC <- readRDS(file.path(path.to.11.output, "selected.cells.PTPRC.rds"))
+}
+
+s.obj <- subset(s.obj, cells = selected.cells.PTPRC)
+
+num.PCA <- 25
+num.PC.used.in.UMAP <- 25
+num.PC.used.in.Clustering <- 25
+regressOut_mode <- NULL
+features_to_regressOut <- NULL
+use.sctransform <- TRUE
+vars.to.regress <- c("percent.mt")
+cluster.resolution <- 0.5
+DefaultAssay(s.obj) <- "RNA"
+s.obj <- JoinLayers(s.obj)
+
+count.cell.in.samples <- table(s.obj$name) %>% data.frame()
+keep.samples <- subset(count.cell.in.samples, count.cell.in.samples$Freq >= 150)$Var1
+
+if (file.exists(file.path(path.to.11.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT))) == FALSE){
+  s.obj.integrated <- s8.integration.and.clustering_V5(s.obj = subset(s.obj, name %in% keep.samples), 
+                                                       save.RDS.s8 = TRUE,
+                                                       path.to.output = path.to.11.output,
+                                                       use.sctransform = TRUE,
+                                                       num.PCA = num.PCA,
+                                                       num.PC.used.in.UMAP = num.PC.used.in.UMAP,
+                                                       num.PC.used.in.Clustering = num.PC.used.in.Clustering,
+                                                       cluster.resolution = cluster.resolution,
+                                                       vars.to.regress = vars.to.regress)    
+} else {
+  print("data exists, reading in ...")
+  s.obj.integrated <- readRDS(file.path(path.to.11.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
+}
