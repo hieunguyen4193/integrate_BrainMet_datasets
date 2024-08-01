@@ -103,7 +103,7 @@ input.list <- list(
     path.to.s.obj = file.path(path.to.main.output, "09_output", "s8_output", "integrated_BrainMet_dataset.output.s8.rds"),
     cluster.resolution = 0.5
   ),
-  v2_GSE193745_integrated_0.5 = list(
+  GSE193745_integrated_0.5 = list(
     path.to.s.obj = file.path(path.to.main.output, "10_output", "s8_output", "integrated_BrainMet_dataset.output.s8.rds"),
     cluster.resolution = 0.5
   ),

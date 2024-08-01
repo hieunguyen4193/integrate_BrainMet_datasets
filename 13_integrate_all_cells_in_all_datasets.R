@@ -28,6 +28,7 @@ path.to.13.output <- file.path(path.to.main.output, "13_output")
 dir.create(path.to.13.output, showWarnings = FALSE, recursive = TRUE)
 
 if (file.exists(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds")) == FALSE){
+  # read data from the v0.2 dataset and the GSE193745 dataset
   s.obj.GSE193745 <- readRDS(file.path(path.to.10.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
   s.obj.prev <- readRDS(file.path(path.to.03.output, "s8_output", sprintf("%s.output.s8.rds", PROJECT)))
   
