@@ -16,6 +16,7 @@ output:
 params:
   path.to.sobj: NA
   cluster.resolution: NA
+  outputdir: NA
 ---
 
 
@@ -69,15 +70,17 @@ main.PROJECT <- "BrainMet_SeuratV5"
 
 path.to.sobj <- params$path.to.sobj
 cluster.resolution <- params$cluster.resolution
+outputdir <- params$outputdir
 
 # path.to.sobj <- "/media/hieunguyen/HNSD01/outdir/BrainMet_SeuratV5/integrate_BrainMet_datasets/integrated_v0.2/09_output/s8_output/integrated_BrainMet_dataset.output.s8.rds"
 # cluster.resolution <- 0.5
+# outputdir <- "/media/hieunguyen/HNSD01/outdir/BrainMet_SeuratV5/integrate_BrainMet_datasets/integrated_v0.3/"
 
-path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
-  
-path.to.04.output <- dirname(path.to.sobj)
+path.to.04.output <- outputdir
 dir.create(path.to.04.output, showWarnings = FALSE, recursive = TRUE)
 
+logdf <- data.frame(input.s.obj = c(path.to.sobj), cluster.resolution = c(cluster.resolution), outputdir = c(outputdir))
+writexl::write_xlsx(logdf, file.path(path.to.04.output, "log.xlsx"))
 s.obj <- readRDS(path.to.sobj)
 
 spec <- "Human"
@@ -421,29 +424,29 @@ sample.metadata %>% create_dt()
 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
-meta.data <- s.obj@meta.data %>% rownames_to_column("barcode")
-meta.data$group <- unlist(lapply(meta.data$name, function(x){
-    return(subset(sample.metadata, sample.metadata$Sample == x)$Group)}))
-meta.data <- meta.data %>% column_to_rownames("barcode")
-meta.data <- meta.data[row.names(s.obj@meta.data), ]
-s.obj <- AddMetaData(object = s.obj, metadata = meta.data$group, col.name = "group")
-tk.gene.set <- read.csv("/media/hieunguyen/HNHD01/data/UKK/geneSet/TK_genes.csv")$TK_gene
-tk.gene.set.split <- split(tk.gene.set, seq(1, 22))
-
-if (file.exists(file.path(path.to.04.output, "finished_saving_TK_genes.csv")) == FALSE){
-  dir.create(file.path(path.to.04.output, "TK_genes"), showWarnings = FALSE, recursive = TRUE)
-  for (gene.id in tk.gene.set){
-    if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id))) == FALSE){
-      p.celltype <- VlnPlot(object = s.obj, group.by = "prediction2", features = c(gene.id), split.by = "group", pt.size = 0)
-      ggsave(plot = p.celltype, filename = sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))
-    }
-    if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_clusters.png", gene.id))) == FALSE){
-      p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
-      ggsave(plot = p.clusters, filename = sprintf("violin_plot_group_%s_clusters.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))    
-    }
-  }  
-  write.csv(data.frame(status = c("finished saving TK genes")), file.path(path.to.04.output, "finished_saving_TK_genes.csv"))
-}
+# meta.data <- s.obj@meta.data %>% rownames_to_column("barcode")
+# meta.data$group <- unlist(lapply(meta.data$name, function(x){
+#     return(subset(sample.metadata, sample.metadata$Sample == x)$Group)}))
+# meta.data <- meta.data %>% column_to_rownames("barcode")
+# meta.data <- meta.data[row.names(s.obj@meta.data), ]
+# s.obj <- AddMetaData(object = s.obj, metadata = meta.data$group, col.name = "group")
+# tk.gene.set <- read.csv("/media/hieunguyen/HNHD01/data/UKK/geneSet/TK_genes.csv")$TK_gene
+# tk.gene.set.split <- split(tk.gene.set, seq(1, 22))
+# 
+# if (file.exists(file.path(path.to.04.output, "finished_saving_TK_genes.csv")) == FALSE){
+#   dir.create(file.path(path.to.04.output, "TK_genes"), showWarnings = FALSE, recursive = TRUE)
+#   for (gene.id in tk.gene.set){
+#     if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id))) == FALSE){
+#       p.celltype <- VlnPlot(object = s.obj, group.by = "prediction2", features = c(gene.id), split.by = "group", pt.size = 0)
+#       ggsave(plot = p.celltype, filename = sprintf("violin_plot_group_%s_predicted_celltype.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))
+#     }
+#     if (file.exists(file.path(path.to.04.output, "TK_genes", sprintf("violin_plot_group_%s_clusters.png", gene.id))) == FALSE){
+#       p.clusters <- VlnPlot(object = s.obj, group.by = sprintf("%s.cluster.%s", reduction.method, cluster.resolution), features = c(gene.id), split.by = "group", slot = "data", pt.size = 0)  
+#       ggsave(plot = p.clusters, filename = sprintf("violin_plot_group_%s_clusters.png", gene.id), device = "png", width = 14, height = 10, path = file.path(path.to.04.output, "TK_genes"))    
+#     }
+#   }  
+#   write.csv(data.frame(status = c("finished saving TK genes")), file.path(path.to.04.output, "finished_saving_TK_genes.csv"))
+# }
 
 ```
 
@@ -562,32 +565,32 @@ DimPlot(object = s.obj, reduction = sprintf("%s_UMAP", reduction.method), label.
 #####----------------------------------------------------------------------#####
 ##### Generate violin plot and umap for each gene in each cell type marker genes
 #####----------------------------------------------------------------------#####
-DefaultAssay(s.obj) <- "SCT"
-
-if (file.exists(file.path(path.to.04.output, "finished_saving_cell_marker_genes.csv")) = FALSE){
-  for (cell.type in unique(markerdb$cell_name)){
-    dir.create(file.path(path.to.04.output, "celltype_markers", cell.type), showWarnings = FALSE, recursive = TRUE)
-    tmp.marker.genes <- subset(markerdb, markerdb$cell_name == cell.type)$GeneID
-    tmp.marker.genes <- tmp.marker.genes[is.na(tmp.marker.genes) == FALSE]
-    
-    for (gene.id in intersect(tmp.marker.genes, row.names(s.obj))){
-      if (file.exists(file.path(path.to.04.output, "celltype_markers", cell.type, sprintf("Celltype_%s_gene_%s.svg", cell.type, gene.id))) == FALSE){
-        # print(sprintf("Working on cell type %s, gene.id %s", cell.type, gene.id))
-        umap.plot <- FeaturePlot(object = s.obj, reduction = "harmony_UMAP", features = c(gene.id), label = TRUE, slot = "data")
-        vln.plot <- VlnPlot(object = s.obj, features = c(gene.id), slot = "data", assay = "SCT")
-        p <- umap.plot + vln.plot
-        ggsave(plot = p, filename = sprintf("Celltype_%s_gene_%s.png", cell.type, gene.id), 
-               path = file.path(path.to.04.output, "celltype_markers", cell.type), 
-               width = 14, 
-               height = 20,
-               device = "png")
-      } else {
-        # print("file exists")
-      }
-    }  
-  }
-  write.csv(data.frame(status = c("finished saving cell marker genes")), file.path(path.to.04.output, "finished_saving_cell_marker_genes.csv"))
-}
+# DefaultAssay(s.obj) <- "SCT"
+# 
+# if (file.exists(file.path(path.to.04.output, "finished_saving_cell_marker_genes.csv")) == FALSE){
+#   for (cell.type in unique(markerdb$cell_name)){
+#     dir.create(file.path(path.to.04.output, "celltype_markers", cell.type), showWarnings = FALSE, recursive = TRUE)
+#     tmp.marker.genes <- subset(markerdb, markerdb$cell_name == cell.type)$GeneID
+#     tmp.marker.genes <- tmp.marker.genes[is.na(tmp.marker.genes) == FALSE]
+#     
+#     for (gene.id in intersect(tmp.marker.genes, row.names(s.obj))){
+#       if (file.exists(file.path(path.to.04.output, "celltype_markers", cell.type, sprintf("Celltype_%s_gene_%s.svg", cell.type, gene.id))) == FALSE){
+#         # print(sprintf("Working on cell type %s, gene.id %s", cell.type, gene.id))
+#         umap.plot <- FeaturePlot(object = s.obj, reduction = "harmony_UMAP", features = c(gene.id), label = TRUE, slot = "data")
+#         vln.plot <- VlnPlot(object = s.obj, features = c(gene.id), slot = "data", assay = "SCT")
+#         p <- umap.plot + vln.plot
+#         ggsave(plot = p, filename = sprintf("Celltype_%s_gene_%s.png", cell.type, gene.id), 
+#                path = file.path(path.to.04.output, "celltype_markers", cell.type), 
+#                width = 14, 
+#                height = 20,
+#                device = "png")
+#       } else {
+#         # print("file exists")
+#       }
+#     }  
+#   }
+#   write.csv(data.frame(status = c("finished saving cell marker genes")), file.path(path.to.04.output, "finished_saving_cell_marker_genes.csv"))
+# }
 
 ```
 

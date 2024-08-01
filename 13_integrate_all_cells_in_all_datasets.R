@@ -20,6 +20,7 @@ outdir <- "/media/hieunguyen/HNSD01/outdir"
 main.PROJECT <- "BrainMet_SeuratV5"
 
 path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
+path.to.03.output <- file.path(path.to.main.output, "03_output")
 path.to.09.output <- file.path(path.to.main.output, "09_output")
 path.to.10.output <- file.path(path.to.main.output, "10_output")
 path.to.11.output <- file.path(path.to.main.output, "11_output")
