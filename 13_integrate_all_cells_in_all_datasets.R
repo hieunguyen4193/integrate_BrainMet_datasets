@@ -83,6 +83,7 @@ if (file.exists(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_d
 s.obj.cluster21 <- subset(s.obj.integrated, cca.cluster.0.5 == 21)
 
 count.sample.in.cluster21 <- table(s.obj.cluster21$name) %>% as.data.frame()
+writexl::write_xlsx(count.sample.in.cluster21, file.path(path.to.13.output, "num_cells_from_datasets_in_cluster_21.xlsx"))
 
 GSE193745.metadata.path <- "/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq/integrate_BrainMet_datasets/GSE193745_Mets2022.TIL.metadata.txt"
 GSE193745.metadata <- read.csv(GSE193745.metadata.path, sep = "\t") %>% rownames_to_column("barcode") %>% subset(select = c(barcode, ID, CancerType))
@@ -98,5 +99,7 @@ merge17.metadata <- merge(merge17.metadata, GSE193745.metadata, by.x = "barcode"
 merge17.metadata.cluster21 <- subset(merge17.metadata, merge17.metadata$cca.cluster.0.5 == 21)
 
 count.cancer.type <- table(merge17.metadata.cluster21$CancerType) %>% as.data.frame()
+writexl::write_xlsx(count.cancer.type, file.path(path.to.13.output, "num_cells_cancer_type_cluster21_GSE193745.xlsx"))
 count.samples <- table(merge17.metadata.cluster21$ID) %>% as.data.frame()
+writexl::write_xlsx(count.samples, file.path(path.to.13.output, "num_cells_samples_cluster21_GSE193745.xlsx"))
 
