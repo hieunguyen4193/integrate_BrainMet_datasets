@@ -74,7 +74,29 @@ if (file.exists(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_d
                                                        vars.to.regress = vars.to.regress)  
   
 } else {
+  print("data existed, reading in ...")
   s.obj.integrated <- readRDS(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds"))
 }
 
+##### count number of cells - samples in cluster 21
+
+s.obj.cluster21 <- subset(s.obj.integrated, cca.cluster.0.5 == 21)
+
+count.sample.in.cluster21 <- table(s.obj.cluster21$name) %>% as.data.frame()
+
+GSE193745.metadata.path <- "/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq/integrate_BrainMet_datasets/GSE193745_Mets2022.TIL.metadata.txt"
+GSE193745.metadata <- read.csv(GSE193745.metadata.path, sep = "\t") %>% rownames_to_column("barcode") %>% subset(select = c(barcode, ID, CancerType))
+
+s.obj.merge17 <- subset(s.obj.integrated, name == "merge17samples") 
+
+merge17.metadata <- s.obj.merge17@meta.data %>% rownames_to_column("barcode") %>% as.data.frame() %>%
+  rowwise() %>%
+  mutate(barcode = str_replace(barcode, "GSE193745_GSE193745_", ""))
+
+merge17.metadata <- merge(merge17.metadata, GSE193745.metadata, by.x = "barcode", by.y = "barcode")
+
+merge17.metadata.cluster21 <- subset(merge17.metadata, merge17.metadata$cca.cluster.0.5 == 21)
+
+count.cancer.type <- table(merge17.metadata.cluster21$CancerType) %>% as.data.frame()
+count.samples <- table(merge17.metadata.cluster21$ID) %>% as.data.frame()
 
