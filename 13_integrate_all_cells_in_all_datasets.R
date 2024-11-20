@@ -80,7 +80,7 @@ if (file.exists(file.path(path.to.13.output, "s8_output", "integrated_BrainMet_d
 
 ##### count number of cells - samples in cluster 21
 
-s.obj.cluster21 <- subset(s.obj.integrated, cca.cluster.0.5 == 21)
+s.obj.cluster21 <- subset(s.obj.integrated, harmony.cluster.0.5 == 21)
 
 count.sample.in.cluster21 <- table(s.obj.cluster21$name) %>% as.data.frame()
 writexl::write_xlsx(count.sample.in.cluster21, file.path(path.to.13.output, "num_cells_from_datasets_in_cluster_21.xlsx"))
@@ -96,7 +96,7 @@ merge17.metadata <- s.obj.merge17@meta.data %>% rownames_to_column("barcode") %>
 
 merge17.metadata <- merge(merge17.metadata, GSE193745.metadata, by.x = "barcode", by.y = "barcode")
 
-merge17.metadata.cluster21 <- subset(merge17.metadata, merge17.metadata$cca.cluster.0.5 == 21)
+merge17.metadata.cluster21 <- subset(merge17.metadata, merge17.metadata$harmony.cluster.0.5 == 21)
 
 count.cancer.type <- table(merge17.metadata.cluster21$CancerType) %>% as.data.frame()
 writexl::write_xlsx(count.cancer.type, file.path(path.to.13.output, "num_cells_cancer_type_cluster21_GSE193745.xlsx"))
@@ -106,12 +106,12 @@ writexl::write_xlsx(count.samples, file.path(path.to.13.output, "num_cells_sampl
 ##### Update 19.11.2024
 gene.list <- c("CD3E", "CD4", "CD8A", "NCAM1", "ITGAX", "CECAM8")
 DefaultAssay(s.obj.integrated) <- "SCT"
-feature.plot <- FeaturePlot(object = s.obj.integrated, reduction = "cca_UMAP", features = gene.list, label = TRUE, pt.size = 1) &
+feature.plot <- FeaturePlot(object = s.obj.integrated, reduction = "harmony_UMAP", features = gene.list, label = TRUE, pt.size = 1) &
   scale_color_gradient(low = "lightgray", high = "#FF0000", na.value = "lightgray")
   # scale_color_distiller(palette = "RdBu")
-violin.plot <- VlnPlot(object = s.obj.integrated, features = gene.list, pt.size = 0, group.by = "cca.cluster.0.5")
+violin.plot <- VlnPlot(object = s.obj.integrated, features = gene.list, pt.size = 0, group.by = "harmony.cluster.0.5")
 s.obj.integrated <- AddModuleScore(object = s.obj.integrated, features = list(gene.list), name = "check_gene_list_", ctrl = 50)
 
-feature.plot.module <- FeaturePlot(object = s.obj.integrated, reduction = "cca_UMAP", features = "check_gene_list_1", label = TRUE, pt.size = 1) &
+feature.plot.module <- FeaturePlot(object = s.obj.integrated, reduction = "harmony_UMAP", features = "check_gene_list_1", label = TRUE, pt.size = 1) &
   scale_color_gradient(low = "lightgray", high = "#FF0000", na.value = "lightgray")
-violin.plot.module <- VlnPlot(object = s.obj.integrated, features = "check_gene_list_1", pt.size = 0, group.by = "cca.cluster.0.5")
+violin.plot.module <- VlnPlot(object = s.obj.integrated, features = "check_gene_list_1", pt.size = 0, group.by = "harmony.cluster.0.5")
