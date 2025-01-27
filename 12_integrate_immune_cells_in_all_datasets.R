@@ -16,7 +16,8 @@ all.integrated.metadata <- list(v0.1 = read.csv(file.path(path.to.main.src, "sam
 
 integrated.version <- "v0.2"
 
-outdir <- "/media/hieunguyen/HNSD01/outdir"
+# outdir <- "/media/hieunguyen/HNSD01/outdir"
+outdir <- "/media/hieunguyen/GSHD_HN01/outdir"
 main.PROJECT <- "BrainMet_SeuratV5"
 
 path.to.main.output <- file.path(outdir, main.PROJECT, code.version, sprintf("integrated_%s", integrated.version))
@@ -70,10 +71,96 @@ if (file.exists(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_d
                                                        num.PC.used.in.UMAP = num.PC.used.in.UMAP,
                                                        num.PC.used.in.Clustering = num.PC.used.in.Clustering,
                                                        cluster.resolution = cluster.resolution,
-                                                       vars.to.regress = vars.to.regress)  
+                                                       vars.to.regressfeature = vars.to.regress)  
   
 } else {
+  print(sprintf(
+    "Data exists at %s",
+    file.path(path.to.12.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds")
+  ))
   s.obj.integrated <- readRDS(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds"))
+}
+
+#####----------------------------------------------------------------------#####
+##### Update 13.01.2025
+#####----------------------------------------------------------------------#####
+path.to.main.src <- "/media/hieunguyen/HNSD01/src/UKK/src/BrainMet/scRNAseq/integrate_BrainMet_datasets"
+path.to.module.score <- file.path(path.to.main.src, "module_scores_20250113.xlsx")
+module.genedf <- readxl::read_excel(path.to.module.score)
+module.gene.list <- list() 
+single.module.genes <- c()
+for (g in colnames(module.genedf)){
+  tmp <- module.genedf[[g]] %>% unique()
+  g <- str_replace_all(g, " ", "_")
+  module.gene.list[[g]] <- tmp[is.na(tmp) == FALSE]
+  single.module.genes <- c(single.module.genes, module.gene.list[[g]])
+}
+
+for (input.col in names(module.gene.list)){
+  module.gene.list[[input.col]] <- unlist(lapply(module.gene.list[[input.col]], function(x){
+    return(str_trim(x, "right"))
+  }))
+}
+
+for (input.list in names(module.gene.list)){
+  DefaultAssay(s.obj.integrated) <- "SCT"
+  s.obj.integrated <- AddModuleScore(object = s.obj.integrated, features = list(module.gene.list[[input.list]]), name = sprintf("%s_", input.list), ctrl = 50)
+}
+
+fake.module.gene.list <- to_vec(
+  for (item in names(module.gene.list)){
+    sprintf("%s_1", item)
+  }
+)
+
+DefaultAssay(s.obj.integrated) <- "SCT"
+Idents(s.obj.integrated) <- "harmony.cluster.0.5"
+
+dir.create(file.path(path.to.12.output, "module_scores"), showWarnings = FALSE, recursive = TRUE)
+
+for (input.module in fake.module.gene.list){
+  
+  feature.plot.module.scores <- FeaturePlot(object = s.obj.integrated, 
+                                            reduction = "harmony_UMAP", 
+                                            label = TRUE, 
+                                            features = c(input.module), 
+                                            pt.size = 0.5) &
+    scale_color_gradient(low = "lightgray", high = "#FF0000", na.value = "lightgray")
+  violin.plot.module.scores <- VlnPlot(object = s.obj.integrated, 
+                                       features = c(input.module), 
+                                       pt.size = 0,
+                                       group.by = "harmony.cluster.0.5")
+  ggsave(plot = feature.plot.module.scores + violin.plot.module.scores, 
+         filename = sprintf("UMAP_and_ViolinPlot_%s.svg", str_replace_all(input.module, "/", "_")),
+         path = file.path(path.to.12.output, "module_scores"),
+         width = 14,
+         height = 10,
+         dpi = 300,
+         device = "svg")
+}
+
+for (input.module in fake.module.gene.list){
+  dir.create(file.path(path.to.12.output, "single_genes", str_replace_all(input.module, "/", "_")), 
+             showWarnings = FALSE, recursive = TRUE)
+  plot.genes <- intersect(row.names(s.obj.integrated), module.gene.list[[str_replace(input.module, "_1", "")]])
+  for (input.gene in plot.genes){
+    feature.plot.module.scores <- FeaturePlot(object = s.obj.integrated, 
+                                              reduction = "harmony_UMAP", 
+                                              label = TRUE, 
+                                              features = c(input.gene), 
+                                              pt.size = 0.5) &
+      scale_color_gradient(low = "lightgray", high = "#FF0000", na.value = "lightgray")
+    violin.plot.module.scores <- VlnPlot(object = s.obj.integrated, 
+                                         features = c(input.gene), 
+                                         pt.size = 0, group.by = "harmony.cluster.0.5")
+    ggsave(plot = feature.plot.module.scores + violin.plot.module.scores, 
+           filename = sprintf("UMAP_and_ViolinPlot_%s.svg", str_replace_all(input.gene, "/", "_")),
+           path = file.path(path.to.12.output, "single_genes", str_replace_all(input.module, "/", "_")),
+           width = 14,
+           height = 10,
+           dpi = 300,
+           device = "svg")
+  }
 }
 
 

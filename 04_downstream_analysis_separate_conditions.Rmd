@@ -227,7 +227,7 @@ annotate_with_pathway <- function(cluster.id, topN = 20, spec = "Human"){
       tmpdf <- subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC)) %>% head(topN)    
   }
   if (nrow(tmpdf) != 0){
-    path.to.cellmarker2.0 <- "/media/hieunguyen/HNHD01/data/CellMarkers_2.0"
+    path.to.cellmarker2.0 <- "/media/hieunguyen/GSHD_HN01/storage/CellMarkers_2.0"
     if (spec == "Human"){
       cell_marker_data <- readxl::read_excel(file.path(path.to.cellmarker2.0, "Cell_marker_Human.xlsx"))
       convertdf <- bitr(tmpdf$gene, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")    

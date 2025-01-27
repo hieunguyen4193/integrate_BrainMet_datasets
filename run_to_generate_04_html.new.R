@@ -13,7 +13,8 @@ path.to.rmd <- file.path(path.to.project.src, "04_downstream_analysis_separate_c
 all.integrated.metadata <- list(v0.1 = read.csv(file.path(path.to.project.src, "samples_to_integrated_20240513.csv")),
                                 v0.2 = read.csv(file.path(path.to.project.src, "samples_to_integrated_20240620.csv")))
 integrated.version <- "v0.2"
-outdir <- "/media/hieunguyen/HNSD01/outdir"
+# outdir <- "/media/hieunguyen/HNSD01/outdir"
+outdir <- "/media/hieunguyen/GSHD_HN01/outdir"
 main.PROJECT <- "BrainMet_SeuratV5"
 
 sample.metadata <- all.integrated.metadata[[integrated.version]]
@@ -34,6 +35,7 @@ path.to.10.output <- file.path(path.to.main.output, "10_output")
 path.to.11.output <- file.path(path.to.main.output, "11_output")
 path.to.12.output <- file.path(path.to.main.output, "12_output")
 path.to.13.output <- file.path(path.to.main.output, "13_output")
+path.to.14.output <- file.path(path.to.main.output, "14_output")
 
 input.list <- list(
   v2_all_cells = list(
@@ -118,6 +120,41 @@ input.list <- list(
   v2_and_GSE193745_all_cells_integrated_0.5 = list(
     path.to.s.obj = file.path(path.to.main.output, "13_output", "s8_output", "integrated_BrainMet_dataset.output.s8.rds"),
     cluster.resolution = 0.5
+  ),
+  v2_and_GSE193745_immune_cells_integrated_0.5_filterRibogenes_30 = list(
+    path.to.s.obj = file.path(path.to.main.output, "14_output", 
+                              sprintf("ribo_thres_%s", 30), 
+                              "s8_output",
+                              "integrated_BrainMet_dataset.output.s8.rds"),
+    cluster.resolution = 0.5
+  ),
+  v2_and_GSE193745_immune_cells_integrated_0.5_filterRibogenes_33 = list(
+    path.to.s.obj = file.path(path.to.main.output, "14_output", 
+                              sprintf("ribo_thres_%s", 33), 
+                              "s8_output",
+                              "integrated_BrainMet_dataset.output.s8.rds"),
+    cluster.resolution = 0.5
+  ),
+  v2_and_GSE193745_immune_cells_integrated_0.5_filterRibogenes_42 = list(
+    path.to.s.obj = file.path(path.to.main.output, "14_output", 
+                              sprintf("ribo_thres_%s", 42), 
+                              "s8_output",
+                              "integrated_BrainMet_dataset.output.s8.rds"),
+    cluster.resolution = 0.5
+  ),
+  v2_and_GSE193745_immune_cells_integrated_0.5_noRiboGenes = list(
+    path.to.s.obj = file.path(path.to.main.output, 
+                              "15_output", 
+                              "s8_output", 
+                              "integrated_BrainMet_dataset.output.s8.rds"),
+    cluster.resolution = 0.5
+  ),
+  v2_and_GSE193745_immune_cells_integrated_0.5_removeRiboGenes = list(
+    path.to.s.obj = file.path(path.to.main.output, 
+                              "16_output", 
+                              "s8_output", 
+                              "integrated_BrainMet_dataset.output.s8.rds"),
+    cluster.resolution = 0.5
   )
 )
 
@@ -134,5 +171,7 @@ for (input.case in names(input.list)){
                         outputdir = outputdir),
                       output_file = save.html.name,
                       output_dir = path.to.save.html)
+  } else {
+    print(sprintf("File html exists at %s", file.path(path.to.save.html, save.html.name)))
   }
 }

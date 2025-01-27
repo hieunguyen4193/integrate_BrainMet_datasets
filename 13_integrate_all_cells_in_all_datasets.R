@@ -104,7 +104,7 @@ count.samples <- table(merge17.metadata.cluster21$ID) %>% as.data.frame()
 writexl::write_xlsx(count.samples, file.path(path.to.13.output, "num_cells_samples_cluster21_GSE193745.xlsx"))
 
 ##### Update 19.11.2024
-gene.list <- c("CD3E", "CD4", "CD8A", "NCAM1", "ITGAX", "CECAM8")
+gene.list <- c("CD3E", "CD4", "CD8A", "NCAM1", "ITGAX", "CEACAM8")
 DefaultAssay(s.obj.integrated) <- "SCT"
 feature.plot <- FeaturePlot(object = s.obj.integrated, reduction = "harmony_UMAP", features = gene.list, label = TRUE, pt.size = 1) &
   scale_color_gradient(low = "lightgray", high = "#FF0000", na.value = "lightgray")
