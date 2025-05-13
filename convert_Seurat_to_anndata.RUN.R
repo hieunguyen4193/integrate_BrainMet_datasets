@@ -30,10 +30,15 @@ dir.create(path.to.12.output, showWarnings = FALSE, recursive = TRUE)
 use.output <- "12_output"
 
 if (use.output == "12_output"){
-  s.obj <- readRDS(file.path(path.to.12.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds"))  
+  path.to.s.obj <- file.path(path.to.12.output, "s8_output", "integrated_BrainMet_dataset.output.s8.rds")
 }
 
-path.to.17.output <- file.path(path.to.main.output, "17_output", sprintf("from_%s", use.output))
-dir.create(path.to.17.output, showWarnings = FALSE, recursive = TRUE)
+path.to.anndata <- file.path(path.to.main.output, "seurat2anndata", sprintf("from_%s", use.output))
+dir.create(path.to.anndata, showWarnings = FALSE, recursive = TRUE)
 
-dimplot
+source(file.path(path.to.main.src, "convert_Seurat_to_anndata.R"))
+
+convert_Seurat_to_anndata(path.to.s.obj = path.to.s.obj, 
+                          reduction.name = "harmony_UMAP", 
+                          cluster.name = "harmony.cluster.0.5", 
+                          outputdir = path.to.anndata)
