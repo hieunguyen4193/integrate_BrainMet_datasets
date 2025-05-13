@@ -4,7 +4,7 @@
 # gc()
 # rm(list = ls())
 
-convert_Seurat_to_anndata <- function(path.to.s.obj, outputdir, reduction.name, cluster.name){
+convert_Seurat_to_anndata <- function(path.to.s.obj, outputdir, umap.name, pca.name, cluster.name){
   s.obj <- readRDS(path.to.s.obj)
   PROJECT <- str_replace(basename(path.to.s.obj), ".rds", "")
   
@@ -13,10 +13,10 @@ convert_Seurat_to_anndata <- function(path.to.s.obj, outputdir, reduction.name, 
   
   s.obj$barcode <- colnames(s.obj)
   
-  s.obj$UMAP_1 <- s.obj@reductions[[reduction.name]]@cell.embeddings[,1]
-  s.obj$UMAP_2 <- s.obj@reductions[[reduction.name]]@cell.embeddings[,2]
+  s.obj$UMAP_1 <- s.obj@reductions[[umap.name]]@cell.embeddings[,1]
+  s.obj$UMAP_2 <- s.obj@reductions[[umap.name]]@cell.embeddings[,2]
   
-  write.csv(s.obj@reductions[[reduction.name]]@cell.embeddings, 
+  write.csv(s.obj@reductions[[pca.name]]@cell.embeddings, 
             file=file.path(outputdir, 
                            sprintf('pca_%s.csv', sprintf("%s_%s", PROJECT, cluster.name))), 
             quote=F, 

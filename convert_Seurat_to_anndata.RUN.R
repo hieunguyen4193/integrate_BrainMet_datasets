@@ -39,6 +39,7 @@ dir.create(path.to.anndata, showWarnings = FALSE, recursive = TRUE)
 source(file.path(path.to.main.src, "convert_Seurat_to_anndata.R"))
 
 convert_Seurat_to_anndata(path.to.s.obj = path.to.s.obj, 
-                          reduction.name = "harmony_UMAP", 
+                          umap.name = "harmony_UMAP", 
+                          pca.name = "RNA_PCA",
                           cluster.name = "harmony.cluster.0.5", 
                           outputdir = path.to.anndata)

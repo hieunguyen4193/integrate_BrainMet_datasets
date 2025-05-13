@@ -39,7 +39,8 @@ dir.create(path.to.17.output, showWarnings = FALSE, recursive = TRUE)
 # sanity check the data
 DimPlot(object = s.obj, reduction = "harmony_UMAP", label = TRUE, label.box = TRUE, group.by = "harmony.cluster.0.5")
 
-if ("Azimuth" %in% installed.packages() == FALSE){
-  BiocManager::install(c("BSgenome.Hsapiens.UCSC.hg38", "EnsDb.Hsapiens.v86c"), update = FALSE)
+# if ("Azimuth" %in% installed.packages() == FALSE){
+  BiocManager::install(c("EnsDb.Hsapiens.v86c"), update = FALSE)
+  install.packages('/media/hieunguyen/GSHD_HN01/storage/offline_pkgs/BSgenome.Hsapiens.UCSC.hg38_1.4.5.tar.gz', type = "source", repos = NULL)
   remotes::install_github('satijalab/azimuth', ref = 'master', upgrade = FALSE)
-}
+# }
