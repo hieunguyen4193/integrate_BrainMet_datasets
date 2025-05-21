@@ -54,15 +54,27 @@ if (file.exists(file.path(path.to.01.output, "check_FindAllMarkers.csv")) == FAL
     saveRDS(cluster.markers.raw, file.path(path.to.01.output, sprintf("cluster_markers_cluster_res_%s.raw.rds", selected.cluster)))  
   }
   write.csv(data.frame(status = c("check_finished_FindAllMarkers.csv")), file.path(path.to.01.output, "check_FindAllMarkers.csv"))
-} else {
-  print("reading saved data")
-  cluster.markers <- readRDS(file.path(path.to.01.output, sprintf("cluster_markers_cluster_res_%s.rds", selected.cluster)))
-  cluster.markers.raw <- readRDS(file.path(path.to.01.output, sprintf("cluster_markers_cluster_res_%s.raw.rds", selected.cluster)))  
-}
-
+} 
 
 #####----------------------------------------------------------------------#####
 ##### annotation with SingleR and Celldex
 #####----------------------------------------------------------------------#####
+if ("SingleR" %in% installed.packages() == FALSE){
+  BiocManager::install("SingleR")
+} 
+if ("celldex" %in% installed.packages() == FALSE){
+  BiocManager::install("celldex")
+  # install the newest celldex database, v1.18, not 1.12
+  # BiocManager::install(c("alabaster.base", "alabaster.matrix", "alabaster.se"))
+  # install.packages("https://www.bioconductor.org/packages/release/bioc/src/contrib/gypsum_1.4.0.tar.gz", type = "source", repos = NULL)
+  # install.packages("https://bioconductor.org/packages/release/data/experiment/src/contrib/celldex_1.18.0.tar.gz",type = "source", repos = NULL)
+} 
 
+library(SingleR)
+library(celldex)
 
+db <- celldex::DatabaseImmuneCellExpressionData()
+singleR.preddf <- SingleR(test = as.SingleCellExperiment(s.obj), ref = db, assay.type.test=1,
+                     labels = db$label.main)
+singleR.preddf <- data.frame(singleR.preddf)
+write.csv(singleR.preddf, file.path(path.to.01.output, "SingleR_Celldex_ImmuneCell_prediction.csv"))
