@@ -54,3 +54,34 @@ if (file.exists(file.path(path.to.12a.output, "integrated_BrainMet_dataset.moreC
   s.obj <- readRDS(file.path(path.to.12a.output, "integrated_BrainMet_dataset.moreClusterRes.output.s8.rds"))
 }
 
+for (cluster.resolution in c(0.1, 0.2, 0.25, 0.3, 0.4)){
+  dir.create(file.path(path.to.12a.output, sprintf("cluster_resolution_%s", cluster.resolution)), showWarnings = FALSE, recursive = TRUE)
+  ##### save all UMAP cor. all cluster resolutions
+  p <- DimPlot(object = s.obj, reduction = "harmony_UMAP", label = TRUE, label.box = TRUE, 
+               group.by = sprintf("harmony.cluster.%s", cluster.resolution))
+  ggsave(plot = p, filename = sprintf("12a_output_integrated_BrainMet.harmony.cluster.%s.rds", cluster.resolution),
+         path = file.path(path.to.12a.output, sprintf("cluster_resolution_%s", cluster.resolution)), device = "svg", width = 14, height = 10, dpi =  300)    
+  
+  Idents(s.obj) <- sprintf("harmony.cluster.%s", cluster.resolution)
+  min.pct <- 0.1
+  s.obj <- PrepSCTFindMarkers(s.obj)
+  print("start running FindAllMarkers ...")
+  cluster.markers <- FindAllMarkers(object = s.obj, 
+                                    assay = "SCT", 
+                                    test.use = "wilcox", 
+                                    slot = "data", 
+                                    min.pct = min.pct, 
+                                    recorrect_umi = TRUE)
+  cluster.markers <- subset(cluster.markers, 
+                              cluster.markers$p_val_adj < 0.05 & 
+                              cluster.markers$avg_log2FC > 0)
+  for (cluster.id in unique(cluster.markers$cluster)){
+    writexl::write_xlsx(
+      subset(cluster.markers, cluster.markers$cluster == cluster.id) %>% arrange(desc(avg_log2FC)),
+      file.path(path.to.12a.output, sprintf("cluster_resolution_%s", cluster.resolution), sprintf("cluster_%s.xlsx", cluster.id))
+    )
+  }
+}
+
+
+

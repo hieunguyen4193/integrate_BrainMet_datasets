@@ -78,3 +78,4 @@ singleR.preddf <- SingleR(test = as.SingleCellExperiment(s.obj), ref = db, assay
                      labels = db$label.main)
 singleR.preddf <- data.frame(singleR.preddf)
 write.csv(singleR.preddf, file.path(path.to.01.output, "SingleR_Celldex_ImmuneCell_prediction.csv"))
+
