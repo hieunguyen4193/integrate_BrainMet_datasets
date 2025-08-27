@@ -58,7 +58,7 @@ source(file.path(scrna_pipeline_src, "helper_functions.R"))
 outdir <- "/media/hieunguyen/GSHD_HN01/outdir"
 main.PROJECT <- "BrainMet_SeuratV5"
 
-reduction.name <- params$reduction.name 
+reduction.name <- params$reduction.name
 cluster.name <- params$cluster.name
 path.to.s.obj <- params$path.to.s.obj
 path.to.save.output <- params$outputdir
@@ -332,22 +332,20 @@ for (cluster.id in all.clusters){
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=14, fig.height=10}
 for (group in names(pathway.groups)){
-  cat(sprintf("### Group %s {.tabset} \n \n", group))
+  cat(sprintf("## Group %s {.tabset} \n", group))
   cat("\n \n")
   for (pathway in pathway.groups[[group]]){
-    cat(sprintf("#### Pathway: %s \n", pathway))
+    cat(sprintf("### Pathway: %s \n", pathway))
+    cat("\n \n")
     tryCatch(
         {
           p <- netVisual_heatmap(cellchat, signaling = c(pathway), color.heatmap = "Reds")
-          return(p)
         },
         error=function(e) {
-            p <- ggplot() + ggtitle("No data to generate heatmap for this pathway")
-            return(p)
+          print("error")
+          p <- ggplot() + ggtitle("No data to generate heatmap for this pathway")
         }
     )
-    
-    
     print(p)
     cat("\n \n")
   }
